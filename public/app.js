@@ -7,6 +7,14 @@ const STATUS_CONFIG = [
   { key: 'scheduled', label: 'Programado' }
 ];
 
+const WORK_STATUS_CONFIG = [
+  { key: 'available', label: 'Disponible' },
+  { key: 'focus', label: 'En foco' },
+  { key: 'meeting', label: 'En reunión' },
+  { key: 'break', label: 'En pausa' },
+  { key: 'offline', label: 'Desconectado' }
+];
+
 const state = {
   brand: { name: 'ZIA Flow', subtitle: 'Agency Workspace' },
   currentUser: null,
@@ -14,6 +22,8 @@ const state = {
   clients: [],
   tasks: [],
   emailLogs: [],
+  workSessions: [],
+  activityLogs: [],
   notificationSettings: {
     enabled: true,
     timezone: 'America/Santo_Domingo',
@@ -202,6 +212,56 @@ function getSubtaskSummary(task) {
   return { total: subtasks.length, completed };
 }
 
+function todayKey() {
+  return isoDate(new Date());
+}
+
+function workStatusLabel(key) {
+  return WORK_STATUS_CONFIG.find((item) => item.key === key)?.label || 'Disponible';
+}
+
+function workStatusClass(key) {
+  return `work-${key || 'available'}`;
+}
+
+function getTodaySession(userId) {
+  return (state.workSessions || []).find((session) => session.userId === userId && session.dateKey === todayKey()) || null;
+}
+
+function getUserActivityLogs(userId, limit = 8) {
+  return (state.activityLogs || []).filter((item) => item.userId === userId).slice(0, limit);
+}
+
+function getUserRemoteMetrics(userId) {
+  const openTasks = state.tasks.filter((task) => taskMatchesAssignee(task, userId) && !isTaskCompleted(task));
+  const overdue = openTasks.filter((task) => task.dueDate && task.dueDate < todayKey());
+  const openSubtasks = state.tasks.flatMap((task) => getTaskSubtasks(task).filter((subtask) => subtask.assigneeId === userId && subtask.status !== 'scheduled'));
+  const completedSubtasks = state.tasks.flatMap((task) => getTaskSubtasks(task).filter((subtask) => subtask.assigneeId === userId && subtask.status === 'scheduled'));
+  return {
+    openTasks: openTasks.length,
+    overdueTasks: overdue.length,
+    openSubtasks: openSubtasks.length,
+    completedSubtasks: completedSubtasks.length,
+    lastActivity: getUserActivityLogs(userId, 1)[0] || null,
+    todaySession: getTodaySession(userId)
+  };
+}
+
+function getSessionWorkedLabel(session) {
+  if (!session?.checkInAt) return 'Sin entrada';
+  const start = new Date(session.checkInAt).getTime();
+  const end = session.checkOutAt ? new Date(session.checkOutAt).getTime() : Date.now();
+  const diff = Math.max(0, end - start);
+  const totalMinutes = Math.round(diff / 60000);
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  return `${hours}h ${minutes.toString().padStart(2, '0')}m`;
+}
+
+function renderWorkStatusOptions(selected = 'available') {
+  return WORK_STATUS_CONFIG.map((status) => `<option value="${status.key}" ${status.key === selected ? 'selected' : ''}>${escapeHtml(status.label)}</option>`).join('');
+}
+
 function renderStatusOptions(selected = '') {
   return STATUS_CONFIG.map((status) => `<option value="${status.key}" ${status.key === selected ? 'selected' : ''}>${escapeHtml(status.label)}</option>`).join('');
 }
@@ -385,11 +445,13 @@ function renderSidebarQuickStats() {
   const overdueTasks = state.tasks.filter((task) => task.dueDate && task.dueDate < isoDate(new Date()) && !isTaskCompleted(task)).length;
   const approved = state.tasks.filter((task) => task.status === 'approved').length;
   const scheduled = state.tasks.filter((task) => task.status === 'scheduled').length;
+  const checkedIn = state.currentUser?.role === 'Admin' ? state.users.filter((user) => getTodaySession(user.id)?.checkInAt).length : 0;
   els.sidebarQuickStats.innerHTML = `
     <li>${totalTasks} tareas activas</li>
     <li>${state.clients.length} clientes en operación</li>
     <li>${overdueTasks} tareas vencidas</li>
     <li>${approved} aprobadas · ${scheduled} programadas</li>
+    ${state.currentUser?.role === 'Admin' ? `<li>${checkedIn}/${state.users.length} con entrada hoy</li>` : ''}
   `;
 }
 
@@ -741,6 +803,47 @@ function renderAdmin() {
     return;
   }
   const settings = state.notificationSettings || {};
+  const teamCards = state.users.map((user) => {
+    const metrics = getUserRemoteMetrics(user.id);
+    const session = metrics.todaySession;
+    const lastActivity = metrics.lastActivity;
+    return `
+      <article class="remote-user-card ${workStatusClass(session?.status || 'offline')}">
+        <div class="client-card-header remote-user-head">
+          <div>
+            <h3 class="client-name">${escapeHtml(user.name)}</h3>
+            <div class="small-text">${escapeHtml(user.role)}</div>
+          </div>
+          <span class="badge ${workStatusClass(session?.status || 'offline')}">${escapeHtml(workStatusLabel(session?.status || 'offline'))}</span>
+        </div>
+        <div class="remote-user-metrics">
+          <div><strong>${session?.checkInAt ? formatDateTime(session.checkInAt) : '—'}</strong><span>Entrada</span></div>
+          <div><strong>${session?.checkOutAt ? formatDateTime(session.checkOutAt) : '—'}</strong><span>Salida</span></div>
+          <div><strong>${escapeHtml(getSessionWorkedLabel(session))}</strong><span>Tiempo</span></div>
+          <div><strong>${metrics.openTasks}</strong><span>Tareas activas</span></div>
+          <div><strong>${metrics.openSubtasks}</strong><span>Subtareas abiertas</span></div>
+          <div><strong>${metrics.overdueTasks}</strong><span>Vencidas</span></div>
+        </div>
+        <div class="remote-copy-block">
+          <strong>Plan de hoy</strong>
+          <p class="small-text">${escapeHtml(session?.focusPlan || 'Sin plan registrado.')}</p>
+        </div>
+        <div class="remote-copy-block">
+          <strong>Bloqueos</strong>
+          <p class="small-text">${escapeHtml(session?.blockers || 'Sin bloqueos reportados.')}</p>
+        </div>
+        <div class="remote-copy-block">
+          <strong>Última actividad</strong>
+          <p class="small-text">${lastActivity ? `${escapeHtml(lastActivity.label)} · ${escapeHtml(formatDateTime(lastActivity.createdAt))}` : 'Sin actividad reciente.'}</p>
+        </div>
+      </article>
+    `;
+  }).join('');
+  const teamCheckedIn = state.users.filter((user) => getTodaySession(user.id)?.checkInAt).length;
+  const teamCheckedOut = state.users.filter((user) => getTodaySession(user.id)?.checkOutAt).length;
+  const totalOverdue = state.users.reduce((acc, user) => acc + getUserRemoteMetrics(user.id).overdueTasks, 0);
+  const recentActivity = (state.activityLogs || []).slice(0, 20);
+
   els.workspace.innerHTML = `
     <div class="admin-grid">
       <section class="panel table-wrap">
@@ -837,6 +940,41 @@ function renderAdmin() {
           <p class="small-text">Usa SMTP para invitaciones, recuperación y recordatorios automáticos. Si SMTP no está configurado, ZIA Flow seguirá registrando el envío en el log interno.</p>
         </form>
       </section>
+      <section class="panel full-span">
+        <div class="panel-header">
+          <div>
+            <p class="eyebrow">Control remoto</p>
+            <h3 class="panel-title">Monitoreo de equipo</h3>
+          </div>
+        </div>
+        <div class="stats-grid compact-grid">
+          <article class="stat-card"><p class="small-text">Con entrada hoy</p><div class="stat-value">${teamCheckedIn}</div></article>
+          <article class="stat-card"><p class="small-text">Con salida registrada</p><div class="stat-value">${teamCheckedOut}</div></article>
+          <article class="stat-card"><p class="small-text">Tareas vencidas</p><div class="stat-value">${totalOverdue}</div></article>
+          <article class="stat-card"><p class="small-text">Actividad reciente</p><div class="stat-value">${recentActivity.length}</div></article>
+        </div>
+        <div class="remote-user-grid">${teamCards}</div>
+      </section>
+      <section class="panel">
+        <div class="panel-header">
+          <div>
+            <p class="eyebrow">Actividad</p>
+            <h3 class="panel-title">Bitácora del equipo</h3>
+          </div>
+        </div>
+        <div class="activity-feed">
+          ${recentActivity.length ? recentActivity.map((item) => `
+            <article class="activity-item">
+              <div class="activity-top">
+                <strong>${escapeHtml(getUserName(item.userId))}</strong>
+                <span class="small-text">${escapeHtml(formatDateTime(item.createdAt))}</span>
+              </div>
+              <p>${escapeHtml(item.label)}</p>
+              <div class="small-text">${escapeHtml(item.kind)}${item.entityType ? ` · ${escapeHtml(item.entityType)}` : ''}</div>
+            </article>
+          `).join('') : `<div class="empty-state">Todavía no hay actividad registrada.</div>`}
+        </div>
+      </section>
       <section class="panel">
         <div class="panel-header">
           <div>
@@ -863,6 +1001,9 @@ function renderAdmin() {
 }
 
 function renderProfile() {
+  const session = getTodaySession(state.currentUser?.id);
+  const myMetrics = getUserRemoteMetrics(state.currentUser?.id);
+  const myActivity = getUserActivityLogs(state.currentUser?.id, 12);
   els.workspace.innerHTML = `
     <div class="profile-grid">
       <section class="panel">
@@ -903,6 +1044,68 @@ function renderProfile() {
           <button class="primary-button" type="submit">Actualizar contraseña</button>
         </form>
       </section>
+      <section class="panel">
+        <div class="panel-header">
+          <div>
+            <p class="eyebrow">Jornada remota</p>
+            <h3 class="panel-title">Mi control de trabajo</h3>
+          </div>
+          <div class="table-actions">
+            <button class="ghost-button" type="button" id="checkInButton" ${session?.checkInAt ? 'disabled' : ''}>Marcar entrada</button>
+            <button class="ghost-button" type="button" id="checkOutButton" ${session?.checkOutAt ? 'disabled' : ''}>Marcar salida</button>
+          </div>
+        </div>
+        <div class="stats-grid compact-grid">
+          <article class="stat-card"><p class="small-text">Entrada</p><div class="stat-value small-value">${escapeHtml(formatDateTime(session?.checkInAt))}</div></article>
+          <article class="stat-card"><p class="small-text">Salida</p><div class="stat-value small-value">${escapeHtml(formatDateTime(session?.checkOutAt))}</div></article>
+          <article class="stat-card"><p class="small-text">Tiempo</p><div class="stat-value small-value">${escapeHtml(getSessionWorkedLabel(session))}</div></article>
+          <article class="stat-card"><p class="small-text">Estado</p><div class="stat-value small-value">${escapeHtml(workStatusLabel(session?.status || 'available'))}</div></article>
+        </div>
+        <form class="stack-form" id="workSessionForm">
+          <label class="field">
+            <span>Estado actual</span>
+            <select id="workStatus">${renderWorkStatusOptions(session?.status || 'available')}</select>
+          </label>
+          <label class="field">
+            <span>Plan del día</span>
+            <textarea id="workFocusPlan" rows="3" placeholder="Ej: calendario de Eves Dental, captions y revisión de reels">${escapeHtml(session?.focusPlan || '')}</textarea>
+          </label>
+          <label class="field">
+            <span>Bloqueos o necesidades</span>
+            <textarea id="workBlockers" rows="2" placeholder="Ej: esperando aprobación, falta material, feedback pendiente">${escapeHtml(session?.blockers || '')}</textarea>
+          </label>
+          <label class="field">
+            <span>Resumen de cierre</span>
+            <textarea id="workEndSummary" rows="3" placeholder="Qué dejaste listo hoy y qué sigue mañana">${escapeHtml(session?.endSummary || '')}</textarea>
+          </label>
+          <button class="primary-button" type="submit">Guardar jornada</button>
+        </form>
+      </section>
+      <section class="panel">
+        <div class="panel-header">
+          <div>
+            <p class="eyebrow">Mi medición</p>
+            <h3 class="panel-title">Carga y entregas</h3>
+          </div>
+        </div>
+        <div class="stats-grid compact-grid">
+          <article class="stat-card"><p class="small-text">Tareas activas</p><div class="stat-value">${myMetrics.openTasks}</div></article>
+          <article class="stat-card"><p class="small-text">Subtareas abiertas</p><div class="stat-value">${myMetrics.openSubtasks}</div></article>
+          <article class="stat-card"><p class="small-text">Subtareas completadas</p><div class="stat-value">${myMetrics.completedSubtasks}</div></article>
+          <article class="stat-card"><p class="small-text">Tareas vencidas</p><div class="stat-value">${myMetrics.overdueTasks}</div></article>
+        </div>
+        <div class="activity-feed compact-feed">
+          ${myActivity.length ? myActivity.map((item) => `
+            <article class="activity-item">
+              <div class="activity-top">
+                <strong>${escapeHtml(item.label)}</strong>
+                <span class="small-text">${escapeHtml(formatDateTime(item.createdAt))}</span>
+              </div>
+              <div class="small-text">${escapeHtml(item.kind)}${item.entityType ? ` · ${escapeHtml(item.entityType)}` : ''}</div>
+            </article>
+          `).join('') : `<div class="empty-state">Aún no hay actividad registrada.</div>`}
+        </div>
+      </section>
     </div>
   `;
 
@@ -937,8 +1140,80 @@ function renderProfile() {
           newPassword: document.getElementById('newPassword').value
         })
       });
+      showToast('Seguridad actualizada', 'Tu contraseña ya fue actualizada.');
       event.target.reset();
-      showToast('Contraseña actualizada', 'Tu contraseña fue cambiada.');
+      await refreshBootstrap();
+      state.tab = 'profile';
+      render();
+    } catch (error) {
+      showToast('Error', error.message, 'error');
+    }
+  });
+
+  document.getElementById('workSessionForm').addEventListener('submit', async (event) => {
+    event.preventDefault();
+    try {
+      const result = await api('/api/work/session/today', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          status: document.getElementById('workStatus').value,
+          focusPlan: document.getElementById('workFocusPlan').value.trim(),
+          blockers: document.getElementById('workBlockers').value.trim(),
+          endSummary: document.getElementById('workEndSummary').value.trim()
+        })
+      });
+      const index = state.workSessions.findIndex((item) => item.id === result.session.id || (item.userId === result.session.userId && item.dateKey === result.session.dateKey));
+      if (index >= 0) state.workSessions[index] = result.session; else state.workSessions.unshift(result.session);
+      showToast('Jornada guardada', 'Se actualizó tu control remoto del día.');
+      await refreshBootstrap();
+      state.tab = 'profile';
+      render();
+    } catch (error) {
+      showToast('Error', error.message, 'error');
+    }
+  });
+
+  document.getElementById('checkInButton').addEventListener('click', async () => {
+    try {
+      const result = await api('/api/work/check-in', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          status: document.getElementById('workStatus').value,
+          focusPlan: document.getElementById('workFocusPlan').value.trim(),
+          blockers: document.getElementById('workBlockers').value.trim(),
+          endSummary: document.getElementById('workEndSummary').value.trim()
+        })
+      });
+      const index = state.workSessions.findIndex((item) => item.id === result.session.id || (item.userId === result.session.userId && item.dateKey === result.session.dateKey));
+      if (index >= 0) state.workSessions[index] = result.session; else state.workSessions.unshift(result.session);
+      showToast('Entrada registrada', 'Tu jornada remota ya inició.');
+      await refreshBootstrap();
+      state.tab = 'profile';
+      render();
+    } catch (error) {
+      showToast('Error', error.message, 'error');
+    }
+  });
+
+  document.getElementById('checkOutButton').addEventListener('click', async () => {
+    try {
+      const result = await api('/api/work/check-out', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          focusPlan: document.getElementById('workFocusPlan').value.trim(),
+          blockers: document.getElementById('workBlockers').value.trim(),
+          endSummary: document.getElementById('workEndSummary').value.trim()
+        })
+      });
+      const index = state.workSessions.findIndex((item) => item.id === result.session.id || (item.userId === result.session.userId && item.dateKey === result.session.dateKey));
+      if (index >= 0) state.workSessions[index] = result.session; else state.workSessions.unshift(result.session);
+      showToast('Salida registrada', 'Tu jornada quedó cerrada.');
+      await refreshBootstrap();
+      state.tab = 'profile';
+      render();
     } catch (error) {
       showToast('Error', error.message, 'error');
     }
@@ -1296,6 +1571,8 @@ async function refreshBootstrap() {
   state.clients = data.clients;
   state.tasks = data.tasks;
   state.emailLogs = data.emailLogs || [];
+  state.workSessions = data.workSessions || [];
+  state.activityLogs = data.activityLogs || [];
   state.notificationSettings = data.notificationSettings || state.notificationSettings;
   seedSelectOptions();
   render();

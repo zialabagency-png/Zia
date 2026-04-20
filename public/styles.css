@@ -495,6 +495,119 @@ code {
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
+
+.compact-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.full-span {
+  grid-column: 1 / -1;
+}
+
+.small-value {
+  font-size: 1rem;
+}
+
+.activity-feed {
+  display: grid;
+  gap: 12px;
+}
+
+.activity-item,
+.remote-user-card {
+  border: 1px solid var(--line);
+  background: rgba(255,255,255,0.03);
+  border-radius: 18px;
+}
+
+.activity-item {
+  padding: 14px;
+}
+
+.activity-item p {
+  margin: 6px 0 6px;
+}
+
+.activity-top,
+.remote-user-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.remote-user-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 16px;
+}
+
+.remote-user-card {
+  padding: 16px;
+  display: grid;
+  gap: 14px;
+}
+
+.remote-user-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.remote-user-metrics > div {
+  padding: 10px 12px;
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  background: rgba(255,255,255,0.035);
+  display: grid;
+  gap: 4px;
+}
+
+.remote-user-metrics strong {
+  font-size: 1rem;
+}
+
+.remote-user-metrics span,
+.remote-copy-block p,
+.activity-item .small-text {
+  color: var(--muted);
+}
+
+.remote-copy-block {
+  display: grid;
+  gap: 6px;
+}
+
+.remote-copy-block p {
+  margin: 0;
+}
+
+.work-available {
+  border-color: rgba(43, 196, 122, 0.3);
+  background: rgba(43, 196, 122, 0.12);
+}
+
+.work-focus {
+  border-color: rgba(77, 139, 255, 0.32);
+  background: rgba(77, 139, 255, 0.12);
+}
+
+.work-meeting {
+  border-color: rgba(243, 181, 63, 0.32);
+  background: rgba(243, 181, 63, 0.12);
+}
+
+.work-break {
+  border-color: rgba(168, 112, 255, 0.32);
+  background: rgba(168, 112, 255, 0.12);
+}
+
+.work-offline {
+  border-color: rgba(124, 140, 160, 0.28);
+  background: rgba(124, 140, 160, 0.12);
+}
+
 .stat-card {
   padding: 18px;
   border-radius: 22px;
@@ -836,8 +949,14 @@ code {
   .stats-grid,
   .clients-grid,
   .admin-grid,
-  .profile-grid {
+  .profile-grid,
+  .remote-user-grid {
     grid-template-columns: 1fr;
+  }
+
+  .compact-grid,
+  .remote-user-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .board-grid {
@@ -967,7 +1086,10 @@ code {
   .stats-grid,
   .clients-grid,
   .admin-grid,
-  .profile-grid {
+  .profile-grid,
+  .remote-user-grid,
+  .compact-grid,
+  .remote-user-metrics {
     grid-template-columns: 1fr;
   }
 
