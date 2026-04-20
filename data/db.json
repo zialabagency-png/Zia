@@ -13,8 +13,8 @@
       "status": "active",
       "passwordHash": "277555513ae80b3ade2e1fb72c0c8aa2$fc73eb19d7247b1b5447799ebe594b51943c28543a12512930e62d926bca842b88fc79a54c622046e3b7efe651cee20bc4c36701803a5329e707db29b0d2f176",
       "createdAt": "2026-04-20T02:50:42.726Z",
-      "updatedAt": "2026-04-20T06:36:26.814Z",
-      "lastLoginAt": "2026-04-20T06:36:26.640Z"
+      "updatedAt": "2026-04-20T20:05:29.850Z",
+      "lastLoginAt": "2026-04-20T20:05:29.618Z"
     },
     {
       "id": "u2",
@@ -70,7 +70,7 @@
       "id": "c1",
       "name": "Terramarine",
       "handle": "@terramarine.rd",
-      "service": "Gestión de redes + campañas",
+      "service": "Gesti\u00f3n de redes + campa\u00f1as",
       "plan": "Mensual",
       "status": "Activo",
       "ownerId": "u2",
@@ -87,7 +87,7 @@
       "id": "c2",
       "name": "Eves Dental Studio",
       "handle": "@evesdentalstudio",
-      "service": "Contenido + diseño",
+      "service": "Contenido + dise\u00f1o",
       "plan": "Mensual",
       "status": "Activo",
       "ownerId": "u3",
@@ -112,7 +112,7 @@
         "Facebook",
         "WhatsApp"
       ],
-      "notes": "Mantener línea visual clara y tono confiable.",
+      "notes": "Mantener l\u00ednea visual clara y tono confiable.",
       "createdAt": "2026-04-20T02:50:43.142Z",
       "updatedAt": "2026-04-20T02:52:43.636Z"
     },
@@ -120,7 +120,7 @@
       "id": "c4",
       "name": "TekkoCode",
       "handle": "@tekkocode",
-      "service": "Branding + captación",
+      "service": "Branding + captaci\u00f3n",
       "plan": "Interno",
       "status": "Interno",
       "ownerId": "u1",
@@ -193,7 +193,7 @@
     {
       "id": "t1",
       "title": "Reel promo Semana Santa",
-      "description": "Crear idea, guion corto y edición para paquete de fin de semana.",
+      "description": "Crear idea, guion corto y edici\u00f3n para paquete de fin de semana.",
       "clientId": "c1",
       "type": "Reel",
       "channel": "Instagram",
@@ -219,7 +219,7 @@
         },
         {
           "id": "cl2",
-          "text": "Edición y subtítulos",
+          "text": "Edici\u00f3n y subt\u00edtulos",
           "done": false
         },
         {
@@ -233,7 +233,7 @@
         {
           "id": "cm1",
           "authorId": "u2",
-          "text": "Usar enfoque más aspiracional y premium.",
+          "text": "Usar enfoque m\u00e1s aspiracional y premium.",
           "createdAt": "2026-04-18T14:20:00.000Z"
         }
       ],
@@ -243,8 +243,8 @@
     },
     {
       "id": "t2",
-      "title": "Carrusel: 5 señales de bruxismo",
-      "description": "Copy educativo y diseño con CTA a evaluación.",
+      "title": "Carrusel: 5 se\u00f1ales de bruxismo",
+      "description": "Copy educativo y dise\u00f1o con CTA a evaluaci\u00f3n.",
       "clientId": "c2",
       "type": "Carrusel",
       "channel": "Instagram",
@@ -260,7 +260,7 @@
       "approvalRequired": true,
       "labels": [
         "educativo",
-        "diseño"
+        "dise\u00f1o"
       ],
       "checklist": [
         {
@@ -270,7 +270,7 @@
         },
         {
           "id": "cl5",
-          "text": "Diseño aprobado interno",
+          "text": "Dise\u00f1o aprobado interno",
           "done": true
         }
       ],
@@ -279,7 +279,7 @@
         {
           "id": "cm2",
           "authorId": "u1",
-          "text": "Buen rumbo. Subir un poco el tamaño del CTA.",
+          "text": "Buen rumbo. Subir un poco el tama\u00f1o del CTA.",
           "createdAt": "2026-04-19T10:05:00.000Z"
         }
       ],
@@ -328,7 +328,7 @@
     },
     {
       "id": "t4",
-      "title": "Landing captación TekkoCode",
+      "title": "Landing captaci\u00f3n TekkoCode",
       "description": "Actualizar hero, CTA y casos de uso para agencias y eCommerce.",
       "clientId": "c4",
       "type": "Web",
@@ -345,7 +345,7 @@
       "approvalRequired": true,
       "labels": [
         "dev",
-        "captación"
+        "captaci\u00f3n"
       ],
       "checklist": [
         {
@@ -368,7 +368,7 @@
     {
       "id": "t5",
       "title": "Calendario mensual mayo",
-      "description": "Definir ideas, pilares y distribución de contenido mensual.",
+      "description": "Definir ideas, pilares y distribuci\u00f3n de contenido mensual.",
       "clientId": "c1",
       "type": "Estrategia",
       "channel": "General",
@@ -449,6 +449,27 @@
       "tokenHash": "376215634285b0c61cd18d9a212e774758b49f75a1423727e1c8c7c773f6bf51",
       "createdAt": "2026-04-20T06:36:26.639Z",
       "expiresAt": "2026-05-20T06:36:26.639Z"
+    },
+    {
+      "id": "s_8f96d27b67d2",
+      "userId": "u1",
+      "tokenHash": "5d707724f89c912dc899bf7530eb289788350faf6e3df9a39de9ca24984cd5d6",
+      "createdAt": "2026-04-20T19:57:43.360Z",
+      "expiresAt": "2026-05-20T19:57:43.360Z"
+    },
+    {
+      "id": "s_1124abeff8bc",
+      "userId": "u1",
+      "tokenHash": "1605abfeb049c7302b12a68e4c5887a5ac475794602da1cf557e34e02b4eeddb",
+      "createdAt": "2026-04-20T20:00:37.801Z",
+      "expiresAt": "2026-05-20T20:00:37.801Z"
+    },
+    {
+      "id": "s_e5c8820dcb55",
+      "userId": "u1",
+      "tokenHash": "b43ae31e810a92e412441e171ef83299876719d590063dad75e743bb5e734337",
+      "createdAt": "2026-04-20T20:05:29.618Z",
+      "expiresAt": "2026-05-20T20:05:29.618Z"
     }
   ],
   "emailTokens": [],
@@ -457,8 +478,8 @@
       "id": "mail_a5bfd088ccc8",
       "toEmail": "franny@agency.local",
       "subject": "Nueva tarea asignada: Calendario Eves Dental",
-      "textBody": "Hola Franny,\n\nSe te asignó una tarea en ZIA Flow.\n\nTarea: Calendario Eves Dental\nCliente: Eves Dental Studio\nEstado: En proceso\nFecha límite: 2026-04-30\n\nAbre tu panel aquí: http://localhost:3000",
-      "htmlBody": "<p>Hola <strong>Franny</strong>,</p><p>Se te asignó una tarea en <strong>ZIA Flow</strong>.</p><ul><li><strong>Tarea:</strong> Calendario Eves Dental</li><li><strong>Cliente:</strong> Eves Dental Studio</li><li><strong>Estado:</strong> En proceso</li><li><strong>Fecha límite:</strong> 2026-04-30</li></ul><p><a href=\"http://localhost:3000\">Abrir ZIA Flow</a></p>",
+      "textBody": "Hola Franny,\n\nSe te asign\u00f3 una tarea en ZIA Flow.\n\nTarea: Calendario Eves Dental\nCliente: Eves Dental Studio\nEstado: En proceso\nFecha l\u00edmite: 2026-04-30\n\nAbre tu panel aqu\u00ed: http://localhost:3000",
+      "htmlBody": "<p>Hola <strong>Franny</strong>,</p><p>Se te asign\u00f3 una tarea en <strong>ZIA Flow</strong>.</p><ul><li><strong>Tarea:</strong> Calendario Eves Dental</li><li><strong>Cliente:</strong> Eves Dental Studio</li><li><strong>Estado:</strong> En proceso</li><li><strong>Fecha l\u00edmite:</strong> 2026-04-30</li></ul><p><a href=\"http://localhost:3000\">Abrir ZIA Flow</a></p>",
       "mode": "log",
       "previewLink": "http://localhost:3000",
       "createdAt": "2026-04-20T06:35:02.820Z"
@@ -467,8 +488,8 @@
       "id": "mail_0ff29b89cd3c",
       "toEmail": "emely@agency.local",
       "subject": "Nueva tarea asignada: Calendario Eves Dental",
-      "textBody": "Hola Emely,\n\nSe te asignó una tarea en ZIA Flow.\n\nTarea: Calendario Eves Dental\nCliente: Eves Dental Studio\nEstado: En proceso\nFecha límite: 2026-04-30\n\nAbre tu panel aquí: http://localhost:3000",
-      "htmlBody": "<p>Hola <strong>Emely</strong>,</p><p>Se te asignó una tarea en <strong>ZIA Flow</strong>.</p><ul><li><strong>Tarea:</strong> Calendario Eves Dental</li><li><strong>Cliente:</strong> Eves Dental Studio</li><li><strong>Estado:</strong> En proceso</li><li><strong>Fecha límite:</strong> 2026-04-30</li></ul><p><a href=\"http://localhost:3000\">Abrir ZIA Flow</a></p>",
+      "textBody": "Hola Emely,\n\nSe te asign\u00f3 una tarea en ZIA Flow.\n\nTarea: Calendario Eves Dental\nCliente: Eves Dental Studio\nEstado: En proceso\nFecha l\u00edmite: 2026-04-30\n\nAbre tu panel aqu\u00ed: http://localhost:3000",
+      "htmlBody": "<p>Hola <strong>Emely</strong>,</p><p>Se te asign\u00f3 una tarea en <strong>ZIA Flow</strong>.</p><ul><li><strong>Tarea:</strong> Calendario Eves Dental</li><li><strong>Cliente:</strong> Eves Dental Studio</li><li><strong>Estado:</strong> En proceso</li><li><strong>Fecha l\u00edmite:</strong> 2026-04-30</li></ul><p><a href=\"http://localhost:3000\">Abrir ZIA Flow</a></p>",
       "mode": "log",
       "previewLink": "http://localhost:3000",
       "createdAt": "2026-04-20T06:35:02.343Z"
@@ -477,8 +498,8 @@
       "id": "mail_25a15e19820e",
       "toEmail": "andrea@agency.local",
       "subject": "Recordatorio: Reel promo Semana Santa vence pronto",
-      "textBody": "Hola Andrea,\n\nTu tarea \"Reel promo Semana Santa\" vence en 1 día.\nCliente: Terramarine\nEstado actual: design\nFecha límite: 2026-04-21\n\nEntra a ZIA Flow: http://127.0.0.1:3101",
-      "htmlBody": "<p>Hola <strong>Andrea</strong>,</p><p>Tu tarea <strong>Reel promo Semana Santa</strong> vence en 1 día.</p><ul><li><strong>Cliente:</strong> Terramarine</li><li><strong>Estado actual:</strong> design</li><li><strong>Fecha límite:</strong> 2026-04-21</li></ul><p><a href=\"http://127.0.0.1:3101\">Abrir ZIA Flow</a></p>",
+      "textBody": "Hola Andrea,\n\nTu tarea \"Reel promo Semana Santa\" vence en 1 d\u00eda.\nCliente: Terramarine\nEstado actual: design\nFecha l\u00edmite: 2026-04-21\n\nEntra a ZIA Flow: http://127.0.0.1:3101",
+      "htmlBody": "<p>Hola <strong>Andrea</strong>,</p><p>Tu tarea <strong>Reel promo Semana Santa</strong> vence en 1 d\u00eda.</p><ul><li><strong>Cliente:</strong> Terramarine</li><li><strong>Estado actual:</strong> design</li><li><strong>Fecha l\u00edmite:</strong> 2026-04-21</li></ul><p><a href=\"http://127.0.0.1:3101\">Abrir ZIA Flow</a></p>",
       "mode": "log",
       "previewLink": "http://127.0.0.1:3101",
       "createdAt": "2026-04-20T04:13:36.441Z"
@@ -486,9 +507,9 @@
     {
       "id": "mail_bc081134934e",
       "toEmail": "franny@agency.local",
-      "subject": "Recordatorio: Carrusel: 5 señales de bruxismo vence pronto",
-      "textBody": "Hola Franny,\n\nTu tarea \"Carrusel: 5 señales de bruxismo\" vence hoy.\nCliente: Eves Dental Studio\nEstado actual: review\nFecha límite: 2026-04-20\n\nEntra a ZIA Flow: http://127.0.0.1:3101",
-      "htmlBody": "<p>Hola <strong>Franny</strong>,</p><p>Tu tarea <strong>Carrusel: 5 señales de bruxismo</strong> vence hoy.</p><ul><li><strong>Cliente:</strong> Eves Dental Studio</li><li><strong>Estado actual:</strong> review</li><li><strong>Fecha límite:</strong> 2026-04-20</li></ul><p><a href=\"http://127.0.0.1:3101\">Abrir ZIA Flow</a></p>",
+      "subject": "Recordatorio: Carrusel: 5 se\u00f1ales de bruxismo vence pronto",
+      "textBody": "Hola Franny,\n\nTu tarea \"Carrusel: 5 se\u00f1ales de bruxismo\" vence hoy.\nCliente: Eves Dental Studio\nEstado actual: review\nFecha l\u00edmite: 2026-04-20\n\nEntra a ZIA Flow: http://127.0.0.1:3101",
+      "htmlBody": "<p>Hola <strong>Franny</strong>,</p><p>Tu tarea <strong>Carrusel: 5 se\u00f1ales de bruxismo</strong> vence hoy.</p><ul><li><strong>Cliente:</strong> Eves Dental Studio</li><li><strong>Estado actual:</strong> review</li><li><strong>Fecha l\u00edmite:</strong> 2026-04-20</li></ul><p><a href=\"http://127.0.0.1:3101\">Abrir ZIA Flow</a></p>",
       "mode": "log",
       "previewLink": "http://127.0.0.1:3101",
       "createdAt": "2026-04-20T04:13:33.156Z"
@@ -497,8 +518,8 @@
       "id": "mail_6e2e2b24a7cd",
       "toEmail": "emely@agency.local",
       "subject": "Recordatorio: Historias promo de libras vence pronto",
-      "textBody": "Hola Emely,\n\nTu tarea \"Historias promo de libras\" vence hoy.\nCliente: Oso Pack Courier\nEstado actual: copy\nFecha límite: 2026-04-20\n\nEntra a ZIA Flow: http://127.0.0.1:3101",
-      "htmlBody": "<p>Hola <strong>Emely</strong>,</p><p>Tu tarea <strong>Historias promo de libras</strong> vence hoy.</p><ul><li><strong>Cliente:</strong> Oso Pack Courier</li><li><strong>Estado actual:</strong> copy</li><li><strong>Fecha límite:</strong> 2026-04-20</li></ul><p><a href=\"http://127.0.0.1:3101\">Abrir ZIA Flow</a></p>",
+      "textBody": "Hola Emely,\n\nTu tarea \"Historias promo de libras\" vence hoy.\nCliente: Oso Pack Courier\nEstado actual: copy\nFecha l\u00edmite: 2026-04-20\n\nEntra a ZIA Flow: http://127.0.0.1:3101",
+      "htmlBody": "<p>Hola <strong>Emely</strong>,</p><p>Tu tarea <strong>Historias promo de libras</strong> vence hoy.</p><ul><li><strong>Cliente:</strong> Oso Pack Courier</li><li><strong>Estado actual:</strong> copy</li><li><strong>Fecha l\u00edmite:</strong> 2026-04-20</li></ul><p><a href=\"http://127.0.0.1:3101\">Abrir ZIA Flow</a></p>",
       "mode": "log",
       "previewLink": "http://127.0.0.1:3101",
       "createdAt": "2026-04-20T04:13:29.778Z"
@@ -507,8 +528,8 @@
       "id": "mail_4b0de3269fa4",
       "toEmail": "emely@agency.local",
       "subject": "Recordatorio: Test assign email vence pronto",
-      "textBody": "Hola Emely,\n\nTu tarea \"Test assign email\" vence hoy.\nCliente: Terramarine\nEstado actual: brief\nFecha límite: 2026-04-20\n\nEntra a ZIA Flow: http://127.0.0.1:3101",
-      "htmlBody": "<p>Hola <strong>Emely</strong>,</p><p>Tu tarea <strong>Test assign email</strong> vence hoy.</p><ul><li><strong>Cliente:</strong> Terramarine</li><li><strong>Estado actual:</strong> brief</li><li><strong>Fecha límite:</strong> 2026-04-20</li></ul><p><a href=\"http://127.0.0.1:3101\">Abrir ZIA Flow</a></p>",
+      "textBody": "Hola Emely,\n\nTu tarea \"Test assign email\" vence hoy.\nCliente: Terramarine\nEstado actual: brief\nFecha l\u00edmite: 2026-04-20\n\nEntra a ZIA Flow: http://127.0.0.1:3101",
+      "htmlBody": "<p>Hola <strong>Emely</strong>,</p><p>Tu tarea <strong>Test assign email</strong> vence hoy.</p><ul><li><strong>Cliente:</strong> Terramarine</li><li><strong>Estado actual:</strong> brief</li><li><strong>Fecha l\u00edmite:</strong> 2026-04-20</li></ul><p><a href=\"http://127.0.0.1:3101\">Abrir ZIA Flow</a></p>",
       "mode": "log",
       "previewLink": "http://127.0.0.1:3101",
       "createdAt": "2026-04-20T04:13:26.347Z"
@@ -517,8 +538,8 @@
       "id": "mail_18f4ca44c2dc",
       "toEmail": "emely@agency.local",
       "subject": "Recordatorio: Test assign email vence pronto",
-      "textBody": "Hola Emely,\n\nTu tarea \"Test assign email\" vence hoy.\nCliente: Terramarine\nEstado actual: brief\nFecha límite: 2026-04-20\n\nEntra a ZIA Flow: http://127.0.0.1:3101",
-      "htmlBody": "<p>Hola <strong>Emely</strong>,</p><p>Tu tarea <strong>Test assign email</strong> vence hoy.</p><ul><li><strong>Cliente:</strong> Terramarine</li><li><strong>Estado actual:</strong> brief</li><li><strong>Fecha límite:</strong> 2026-04-20</li></ul><p><a href=\"http://127.0.0.1:3101\">Abrir ZIA Flow</a></p>",
+      "textBody": "Hola Emely,\n\nTu tarea \"Test assign email\" vence hoy.\nCliente: Terramarine\nEstado actual: brief\nFecha l\u00edmite: 2026-04-20\n\nEntra a ZIA Flow: http://127.0.0.1:3101",
+      "htmlBody": "<p>Hola <strong>Emely</strong>,</p><p>Tu tarea <strong>Test assign email</strong> vence hoy.</p><ul><li><strong>Cliente:</strong> Terramarine</li><li><strong>Estado actual:</strong> brief</li><li><strong>Fecha l\u00edmite:</strong> 2026-04-20</li></ul><p><a href=\"http://127.0.0.1:3101\">Abrir ZIA Flow</a></p>",
       "mode": "log",
       "previewLink": "http://127.0.0.1:3101",
       "createdAt": "2026-04-20T04:13:22.870Z"
@@ -527,8 +548,8 @@
       "id": "mail_362c50dfaef1",
       "toEmail": "emely@agency.local",
       "subject": "Nueva tarea asignada: Test assign email",
-      "textBody": "Hola Emely,\n\nSe te asignó una tarea en ZIA Flow.\n\nTarea: Test assign email\nCliente: Terramarine\nEstado: brief\nFecha límite: 2026-04-20\n\nAbre tu panel aquí: http://127.0.0.1:3101",
-      "htmlBody": "<p>Hola <strong>Emely</strong>,</p><p>Se te asignó una tarea en <strong>ZIA Flow</strong>.</p><ul><li><strong>Tarea:</strong> Test assign email</li><li><strong>Cliente:</strong> Terramarine</li><li><strong>Estado:</strong> brief</li><li><strong>Fecha límite:</strong> 2026-04-20</li></ul><p><a href=\"http://127.0.0.1:3101\">Abrir ZIA Flow</a></p>",
+      "textBody": "Hola Emely,\n\nSe te asign\u00f3 una tarea en ZIA Flow.\n\nTarea: Test assign email\nCliente: Terramarine\nEstado: brief\nFecha l\u00edmite: 2026-04-20\n\nAbre tu panel aqu\u00ed: http://127.0.0.1:3101",
+      "htmlBody": "<p>Hola <strong>Emely</strong>,</p><p>Se te asign\u00f3 una tarea en <strong>ZIA Flow</strong>.</p><ul><li><strong>Tarea:</strong> Test assign email</li><li><strong>Cliente:</strong> Terramarine</li><li><strong>Estado:</strong> brief</li><li><strong>Fecha l\u00edmite:</strong> 2026-04-20</li></ul><p><a href=\"http://127.0.0.1:3101\">Abrir ZIA Flow</a></p>",
       "mode": "log",
       "previewLink": "http://127.0.0.1:3101",
       "createdAt": "2026-04-20T04:12:49.011Z"
@@ -537,13 +558,15 @@
       "id": "mail_362986ae66ea",
       "toEmail": "emely@agency.local",
       "subject": "Nueva tarea asignada: Test assign email",
-      "textBody": "Hola Emely,\n\nSe te asignó una tarea en ZIA Flow.\n\nTarea: Test assign email\nCliente: Terramarine\nEstado: brief\nFecha límite: 2026-04-20\n\nAbre tu panel aquí: http://127.0.0.1:3101",
-      "htmlBody": "<p>Hola <strong>Emely</strong>,</p><p>Se te asignó una tarea en <strong>ZIA Flow</strong>.</p><ul><li><strong>Tarea:</strong> Test assign email</li><li><strong>Cliente:</strong> Terramarine</li><li><strong>Estado:</strong> brief</li><li><strong>Fecha límite:</strong> 2026-04-20</li></ul><p><a href=\"http://127.0.0.1:3101\">Abrir ZIA Flow</a></p>",
+      "textBody": "Hola Emely,\n\nSe te asign\u00f3 una tarea en ZIA Flow.\n\nTarea: Test assign email\nCliente: Terramarine\nEstado: brief\nFecha l\u00edmite: 2026-04-20\n\nAbre tu panel aqu\u00ed: http://127.0.0.1:3101",
+      "htmlBody": "<p>Hola <strong>Emely</strong>,</p><p>Se te asign\u00f3 una tarea en <strong>ZIA Flow</strong>.</p><ul><li><strong>Tarea:</strong> Test assign email</li><li><strong>Cliente:</strong> Terramarine</li><li><strong>Estado:</strong> brief</li><li><strong>Fecha l\u00edmite:</strong> 2026-04-20</li></ul><p><a href=\"http://127.0.0.1:3101\">Abrir ZIA Flow</a></p>",
       "mode": "log",
       "previewLink": "http://127.0.0.1:3101",
       "createdAt": "2026-04-20T04:12:36.749Z"
     }
   ],
+  "workSessions": [],
+  "activityLogs": [],
   "notificationSettings": {
     "enabled": true,
     "timezone": "America/Santo_Domingo",
