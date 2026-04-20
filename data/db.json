@@ -13,8 +13,8 @@
       "status": "active",
       "passwordHash": "277555513ae80b3ade2e1fb72c0c8aa2$fc73eb19d7247b1b5447799ebe594b51943c28543a12512930e62d926bca842b88fc79a54c622046e3b7efe651cee20bc4c36701803a5329e707db29b0d2f176",
       "createdAt": "2026-04-20T02:50:42.726Z",
-      "updatedAt": "2026-04-20T04:11:53.423Z",
-      "lastLoginAt": "2026-04-20T04:11:53.129Z"
+      "updatedAt": "2026-04-20T06:36:26.814Z",
+      "lastLoginAt": "2026-04-20T06:36:26.640Z"
     },
     {
       "id": "u2",
@@ -136,46 +136,59 @@
   ],
   "tasks": [
     {
-      "id": "t_0b2b6d56bf24",
-      "title": "Test assign email",
-      "description": "",
-      "clientId": "c1",
-      "type": "Post",
+      "id": "t_d8b381a42bff",
+      "title": "Calendario Eves Dental",
+      "description": "Calendario del mes",
+      "clientId": "c2",
+      "type": "Calendario",
       "channel": "Instagram",
-      "format": "",
+      "format": "Mensual",
       "assigneeId": "u2",
+      "assigneeIds": [
+        "u2",
+        "u3"
+      ],
       "priority": "Alta",
-      "status": "brief",
-      "dueDate": "2026-04-20",
-      "publishDate": "",
-      "approvalRequired": false,
-      "labels": [],
-      "checklist": [],
+      "status": "in_progress",
+      "dueDate": "2026-04-30",
+      "publishDate": "2026-05-01",
+      "approvalRequired": true,
+      "labels": [
+        "calendario"
+      ],
+      "checklist": [
+        {
+          "id": "cl_66d7fd7a08c3",
+          "text": "Brief aprobado",
+          "done": false
+        }
+      ],
+      "subtasks": [
+        {
+          "id": "st_cal1",
+          "title": "Copies del mes",
+          "assigneeId": "u2",
+          "dueDate": "2026-04-28",
+          "status": "review",
+          "deliverable": "Documento final de copies",
+          "createdAt": "2026-04-20T06:34:58.767Z",
+          "updatedAt": "2026-04-20T06:34:58.520Z"
+        },
+        {
+          "id": "st_cal2",
+          "title": "Artes del mes",
+          "assigneeId": "u3",
+          "dueDate": "2026-04-29",
+          "status": "in_progress",
+          "deliverable": "Artes listos en Canva",
+          "createdAt": "2026-04-20T06:34:58.767Z",
+          "updatedAt": "2026-04-20T06:34:58.520Z"
+        }
+      ],
       "comments": [],
       "createdById": "u1",
-      "createdAt": "2026-04-20T04:12:45.682Z",
-      "updatedAt": "2026-04-20T04:12:45.539Z"
-    },
-    {
-      "id": "t_cb0c5ce7f72c",
-      "title": "Test assign email",
-      "description": "",
-      "clientId": "c1",
-      "type": "Post",
-      "channel": "Instagram",
-      "format": "",
-      "assigneeId": "u2",
-      "priority": "Alta",
-      "status": "brief",
-      "dueDate": "2026-04-20",
-      "publishDate": "",
-      "approvalRequired": false,
-      "labels": [],
-      "checklist": [],
-      "comments": [],
-      "createdById": "u1",
-      "createdAt": "2026-04-20T04:12:32.476Z",
-      "updatedAt": "2026-04-20T04:12:32.137Z"
+      "createdAt": "2026-04-20T06:34:58.767Z",
+      "updatedAt": "2026-04-20T06:34:58.520Z"
     },
     {
       "id": "t1",
@@ -186,8 +199,11 @@
       "channel": "Instagram",
       "format": "Vertical 9:16",
       "assigneeId": "u5",
+      "assigneeIds": [
+        "u5"
+      ],
       "priority": "Alta",
-      "status": "design",
+      "status": "in_progress",
       "dueDate": "2026-04-21",
       "publishDate": "2026-04-22",
       "approvalRequired": true,
@@ -212,6 +228,7 @@
           "done": false
         }
       ],
+      "subtasks": [],
       "comments": [
         {
           "id": "cm1",
@@ -233,6 +250,9 @@
       "channel": "Instagram",
       "format": "1080x1350",
       "assigneeId": "u3",
+      "assigneeIds": [
+        "u3"
+      ],
       "priority": "Media",
       "status": "review",
       "dueDate": "2026-04-20",
@@ -254,6 +274,7 @@
           "done": true
         }
       ],
+      "subtasks": [],
       "comments": [
         {
           "id": "cm2",
@@ -275,8 +296,11 @@
       "channel": "Instagram",
       "format": "1080x1920",
       "assigneeId": "u2",
+      "assigneeIds": [
+        "u2"
+      ],
       "priority": "Alta",
-      "status": "copy",
+      "status": "in_progress",
       "dueDate": "2026-04-20",
       "publishDate": "2026-04-20",
       "approvalRequired": false,
@@ -296,6 +320,7 @@
           "done": false
         }
       ],
+      "subtasks": [],
       "comments": [],
       "createdById": "",
       "createdAt": "2026-04-19T08:00:00.000Z",
@@ -310,8 +335,11 @@
       "channel": "Website",
       "format": "Landing",
       "assigneeId": "u4",
+      "assigneeIds": [
+        "u4"
+      ],
       "priority": "Alta",
-      "status": "doing",
+      "status": "in_progress",
       "dueDate": "2026-04-25",
       "publishDate": "2026-04-26",
       "approvalRequired": true,
@@ -331,6 +359,7 @@
           "done": false
         }
       ],
+      "subtasks": [],
       "comments": [],
       "createdById": "",
       "createdAt": "2026-04-16T12:00:00.000Z",
@@ -345,8 +374,11 @@
       "channel": "General",
       "format": "Documento",
       "assigneeId": "u2",
+      "assigneeIds": [
+        "u2"
+      ],
       "priority": "Media",
-      "status": "brief",
+      "status": "not_started",
       "dueDate": "2026-04-24",
       "publishDate": "2026-04-28",
       "approvalRequired": true,
@@ -354,6 +386,7 @@
         "estrategia"
       ],
       "checklist": [],
+      "subtasks": [],
       "comments": [],
       "createdById": "",
       "createdAt": "2026-04-19T12:00:00.000Z",
@@ -368,8 +401,11 @@
       "channel": "Facebook",
       "format": "1080x1080",
       "assigneeId": "u3",
+      "assigneeIds": [
+        "u3"
+      ],
       "priority": "Baja",
-      "status": "published",
+      "status": "scheduled",
       "dueDate": "2026-04-15",
       "publishDate": "2026-04-15",
       "approvalRequired": false,
@@ -377,6 +413,7 @@
         "publicado"
       ],
       "checklist": [],
+      "subtasks": [],
       "comments": [],
       "createdById": "",
       "createdAt": "2026-04-13T12:00:00.000Z",
@@ -391,10 +428,51 @@
       "tokenHash": "ea75172763ab29eb023008b89194e82d467298a976ae49c3474b1d286fa2e085",
       "createdAt": "2026-04-20T04:11:53.129Z",
       "expiresAt": "2026-05-20T04:11:53.129Z"
+    },
+    {
+      "id": "s_38d38c8ae8eb",
+      "userId": "u1",
+      "tokenHash": "e8f67244282d05e5df0786a8a481b325d647c0f9c7458a2df0f918cbcb993f95",
+      "createdAt": "2026-04-20T05:42:18.009Z",
+      "expiresAt": "2026-05-20T05:42:18.009Z"
+    },
+    {
+      "id": "s_bdb8ef8bf080",
+      "userId": "u1",
+      "tokenHash": "244d2ac9cbe0a3aa64e7ac00bc7530bb62c8589de468a695c66fc4877826f971",
+      "createdAt": "2026-04-20T06:34:32.041Z",
+      "expiresAt": "2026-05-20T06:34:32.041Z"
+    },
+    {
+      "id": "s_0cb13ae87d6f",
+      "userId": "u1",
+      "tokenHash": "376215634285b0c61cd18d9a212e774758b49f75a1423727e1c8c7c773f6bf51",
+      "createdAt": "2026-04-20T06:36:26.639Z",
+      "expiresAt": "2026-05-20T06:36:26.639Z"
     }
   ],
   "emailTokens": [],
   "emailLogs": [
+    {
+      "id": "mail_a5bfd088ccc8",
+      "toEmail": "franny@agency.local",
+      "subject": "Nueva tarea asignada: Calendario Eves Dental",
+      "textBody": "Hola Franny,\n\nSe te asignó una tarea en ZIA Flow.\n\nTarea: Calendario Eves Dental\nCliente: Eves Dental Studio\nEstado: En proceso\nFecha límite: 2026-04-30\n\nAbre tu panel aquí: http://localhost:3000",
+      "htmlBody": "<p>Hola <strong>Franny</strong>,</p><p>Se te asignó una tarea en <strong>ZIA Flow</strong>.</p><ul><li><strong>Tarea:</strong> Calendario Eves Dental</li><li><strong>Cliente:</strong> Eves Dental Studio</li><li><strong>Estado:</strong> En proceso</li><li><strong>Fecha límite:</strong> 2026-04-30</li></ul><p><a href=\"http://localhost:3000\">Abrir ZIA Flow</a></p>",
+      "mode": "log",
+      "previewLink": "http://localhost:3000",
+      "createdAt": "2026-04-20T06:35:02.820Z"
+    },
+    {
+      "id": "mail_0ff29b89cd3c",
+      "toEmail": "emely@agency.local",
+      "subject": "Nueva tarea asignada: Calendario Eves Dental",
+      "textBody": "Hola Emely,\n\nSe te asignó una tarea en ZIA Flow.\n\nTarea: Calendario Eves Dental\nCliente: Eves Dental Studio\nEstado: En proceso\nFecha límite: 2026-04-30\n\nAbre tu panel aquí: http://localhost:3000",
+      "htmlBody": "<p>Hola <strong>Emely</strong>,</p><p>Se te asignó una tarea en <strong>ZIA Flow</strong>.</p><ul><li><strong>Tarea:</strong> Calendario Eves Dental</li><li><strong>Cliente:</strong> Eves Dental Studio</li><li><strong>Estado:</strong> En proceso</li><li><strong>Fecha límite:</strong> 2026-04-30</li></ul><p><a href=\"http://localhost:3000\">Abrir ZIA Flow</a></p>",
+      "mode": "log",
+      "previewLink": "http://localhost:3000",
+      "createdAt": "2026-04-20T06:35:02.343Z"
+    },
     {
       "id": "mail_25a15e19820e",
       "toEmail": "andrea@agency.local",
