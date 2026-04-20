@@ -427,7 +427,7 @@ function renderTaskCard(task) {
 function renderTaskTableHtml(tasks) {
   return `
     <section class="panel table-wrap">
-      <table class="data-table">
+      <table class="data-table stacked-table">
         <thead>
           <tr>
             <th>Tarea</th>
@@ -442,16 +442,16 @@ function renderTaskTableHtml(tasks) {
         <tbody>
           ${tasks.length ? tasks.map((task) => `
             <tr>
-              <td>
+              <td data-label="Tarea">
                 <strong>${escapeHtml(task.title)}</strong>
                 <div class="table-subtext">${escapeHtml(task.type)} · ${escapeHtml(task.channel)} · ${escapeHtml(task.priority)}</div>
               </td>
-              <td>${escapeHtml(getClientName(task.clientId))}</td>
-              <td>${escapeHtml(getUserName(task.assigneeId))}</td>
-              <td><span class="badge">${escapeHtml(statusLabel(task.status))}</span></td>
-              <td>${escapeHtml(formatDate(task.dueDate))}</td>
-              <td>${(task.attachments || []).length}</td>
-              <td>
+              <td data-label="Cliente">${escapeHtml(getClientName(task.clientId))}</td>
+              <td data-label="Responsable">${escapeHtml(getUserName(task.assigneeId))}</td>
+              <td data-label="Estado"><span class="badge">${escapeHtml(statusLabel(task.status))}</span></td>
+              <td data-label="Entrega">${escapeHtml(formatDate(task.dueDate))}</td>
+              <td data-label="Adjuntos">${(task.attachments || []).length}</td>
+              <td data-label="Acciones">
                 <div class="table-actions">
                   <button class="text-button" data-edit-task="${task.id}">Editar</button>
                   <button class="text-button" data-quick-status="${task.id}">Siguiente etapa</button>
@@ -493,14 +493,16 @@ function renderCalendar() {
           <button class="ghost-button" id="nextMonthButton">Mes siguiente →</button>
         </div>
       </div>
-      <div class="calendar-grid">
-        ${['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'].map((day) => `<div class="small-text">${day}</div>`).join('')}
-        ${days.map((day) => `
-          <div class="calendar-day ${day.isCurrentMonth ? '' : 'muted'}">
-            <strong>${day.date.getDate()}</strong>
-            ${day.items.slice(0, 3).map((task) => `<div class="calendar-item" data-edit-task="${task.id}">${escapeHtml(task.title)}</div>`).join('')}
-          </div>
-        `).join('')}
+      <div class="calendar-scroll">
+        <div class="calendar-grid">
+          ${['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'].map((day) => `<div class="small-text calendar-weekday">${day}</div>`).join('')}
+          ${days.map((day) => `
+            <div class="calendar-day ${day.isCurrentMonth ? '' : 'muted'}">
+              <strong>${day.date.getDate()}</strong>
+              ${day.items.slice(0, 3).map((task) => `<div class="calendar-item" data-edit-task="${task.id}">${escapeHtml(task.title)}</div>`).join('')}
+            </div>
+          `).join('')}
+        </div>
       </div>
     </section>
   `;
@@ -567,7 +569,7 @@ function renderAdmin() {
             <h3 class="panel-title">Equipo y accesos</h3>
           </div>
         </div>
-        <table class="data-table">
+        <table class="data-table stacked-table">
           <thead>
             <tr>
               <th>Nombre</th>
@@ -580,14 +582,14 @@ function renderAdmin() {
           <tbody>
             ${state.users.map((user) => `
               <tr>
-                <td>
+                <td data-label="Nombre">
                   <strong>${escapeHtml(user.name)}</strong>
                   <div class="table-subtext">Último acceso ${escapeHtml(formatDateTime(user.lastLoginAt))}</div>
                 </td>
-                <td>${escapeHtml(user.role)}</td>
-                <td><span class="badge">${escapeHtml(user.status || 'active')}</span></td>
-                <td>${escapeHtml(user.email)}</td>
-                <td>
+                <td data-label="Rol">${escapeHtml(user.role)}</td>
+                <td data-label="Estado"><span class="badge">${escapeHtml(user.status || 'active')}</span></td>
+                <td data-label="Correo">${escapeHtml(user.email)}</td>
+                <td data-label="Acciones">
                   <div class="table-actions">
                     <button class="text-button" data-edit-user="${user.id}">Editar</button>
                     <button class="text-button" data-send-invite="${user.id}">Invitar</button>
