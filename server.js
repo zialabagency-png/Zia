@@ -335,6 +335,72 @@ function normalizeReminderEvent(event = {}) {
   };
 }
 
+function mapWorkStatus(value) {
+  const normalized = String(value || '').trim().toLowerCase();
+  const alias = {
+    disponible: 'available',
+    active: 'available',
+    activo: 'available',
+    enfocado: 'focus',
+    foco: 'focus',
+    focus: 'focus',
+    meeting: 'meeting',
+    reunion: 'meeting',
+    reunión: 'meeting',
+    pausa: 'break',
+    descanso: 'break',
+    break: 'break',
+    offline: 'offline',
+    desconectado: 'offline'
+  };
+  return ['available', 'focus', 'meeting', 'break', 'offline'].includes(normalized) ? normalized : (alias[normalized] || 'available');
+}
+
+function workStatusText(value) {
+  return {
+    available: 'Disponible',
+    focus: 'En foco',
+    meeting: 'En reunión',
+    break: 'En pausa',
+    offline: 'Desconectado'
+  }[mapWorkStatus(value)] || 'Disponible';
+}
+
+function normalizeWorkSession(session = {}) {
+  const now = nowIso();
+  const dateKey = normalizeDate(session.dateKey || session.checkInAt || session.createdAt || new Date());
+  return {
+    id: session.id || generateId('ws'),
+    userId: String(session.userId || '').trim(),
+    dateKey,
+    checkInAt: session.checkInAt || '',
+    checkOutAt: session.checkOutAt || '',
+    status: mapWorkStatus(session.status),
+    focusPlan: String(session.focusPlan || '').trim(),
+    endSummary: String(session.endSummary || '').trim(),
+    blockers: String(session.blockers || '').trim(),
+    createdAt: session.createdAt || now,
+    updatedAt: session.updatedAt || now
+  };
+}
+
+function normalizeActivityLog(log = {}) {
+  return {
+    id: log.id || generateId('act'),
+    userId: String(log.userId || '').trim(),
+    kind: String(log.kind || 'generic').trim(),
+    label: String(log.label || '').trim() || 'Actividad registrada',
+    entityType: String(log.entityType || '').trim(),
+    entityId: String(log.entityId || '').trim(),
+    meta: log.meta || {},
+    createdAt: log.createdAt || nowIso()
+  };
+}
+
+function todayDateKey() {
+  return normalizeDate(new Date());
+}
+
 function defaultSeedData() {
   const currentTime = nowIso();
   const adminPassword = hashPassword(process.env.SEED_ADMIN_PASSWORD || 'ZiaFlow2026!');
@@ -363,6 +429,14 @@ function defaultSeedData() {
     sessions: [],
     emailTokens: [],
     emailLogs: [],
+    workSessions: [
+      { id: 'ws1', userId: 'u2', dateKey: todayDateKey(), checkInAt: currentTime, checkOutAt: '', status: 'focus', focusPlan: 'Completar copies del calendario y revisar captions de promociones.', endSummary: '', blockers: '', createdAt: currentTime, updatedAt: currentTime },
+      { id: 'ws2', userId: 'u3', dateKey: todayDateKey(), checkInAt: currentTime, checkOutAt: '', status: 'available', focusPlan: 'Diseñar piezas del calendario y propuesta visual de cliente dental.', endSummary: '', blockers: '', createdAt: currentTime, updatedAt: currentTime }
+    ],
+    activityLogs: [
+      { id: 'act1', userId: 'u2', kind: 'session', label: 'Inició su jornada remota.', entityType: 'work_session', entityId: 'ws1', meta: { source: 'seed' }, createdAt: currentTime },
+      { id: 'act2', userId: 'u3', kind: 'session', label: 'Actualizó su plan del día.', entityType: 'work_session', entityId: 'ws2', meta: { source: 'seed' }, createdAt: currentTime }
+    ],
     notificationSettings: defaultNotificationSettings(),
     reminderEvents: []
   };
@@ -382,6 +456,8 @@ function loadSeedData() {
       sessions: normalizeArray(existing.sessions),
       emailTokens: normalizeArray(existing.emailTokens).map(normalizeEmailToken),
       emailLogs: normalizeArray(existing.emailLogs).map(normalizeEmailLog),
+      workSessions: normalizeArray(existing.workSessions).map(normalizeWorkSession),
+      activityLogs: normalizeArray(existing.activityLogs).map(normalizeActivityLog),
       notificationSettings: normalizeNotificationSettings(existing.notificationSettings || fallback.notificationSettings),
       reminderEvents: normalizeArray(existing.reminderEvents).map(normalizeReminderEvent)
     };
@@ -416,10 +492,28 @@ function createFileAdapter() {
       return normalized;
     });
     db.notificationSettings = normalizeNotificationSettings(db.notificationSettings);
+    db.workSessions = normalizeArray(db.workSessions)
+      .map(normalizeWorkSession)
+      .filter((session) => new Date(`${session.dateKey}T00:00:00`).getTime() > now - (1000 * 60 * 60 * 24 * 60));
+    db.activityLogs = normalizeArray(db.activityLogs)
+      .map(normalizeActivityLog)
+      .filter((item) => new Date(item.createdAt).getTime() > now - (1000 * 60 * 60 * 24 * 45))
+      .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+      .slice(0, 500);
     db.reminderEvents = normalizeArray(db.reminderEvents)
       .map(normalizeReminderEvent)
       .filter((event) => new Date(event.sentAt || event.createdAt).getTime() > now - (1000 * 60 * 60 * 24 * 120));
     return db;
+  }
+
+  function listVisibleWorkSessions(db, currentUser) {
+    const sessions = normalizeArray(db.workSessions).map(normalizeWorkSession).sort((a, b) => new Date(b.updatedAt || b.createdAt) - new Date(a.updatedAt || a.createdAt));
+    return currentUser?.role === 'Admin' ? sessions.slice(0, 120) : sessions.filter((item) => item.userId === currentUser?.id).slice(0, 30);
+  }
+
+  function listVisibleActivityLogs(db, currentUser) {
+    const logs = normalizeArray(db.activityLogs).map(normalizeActivityLog).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    return currentUser?.role === 'Admin' ? logs.slice(0, 120) : logs.filter((item) => item.userId === currentUser?.id).slice(0, 40);
   }
 
   function decorateTasks(db) {
@@ -460,6 +554,8 @@ function createFileAdapter() {
         clients: db.clients,
         tasks,
         emailLogs: currentUser.role === 'Admin' ? db.emailLogs.slice().sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).slice(0, 25) : [],
+        workSessions: listVisibleWorkSessions(db, currentUser),
+        activityLogs: listVisibleActivityLogs(db, currentUser),
         notificationSettings: normalizeNotificationSettings(db.notificationSettings)
       };
     },
@@ -634,6 +730,40 @@ function createFileAdapter() {
       writeDb(db);
       return event;
     },
+    async getWorkSessionForDate(userId, dateKey = todayDateKey()) {
+      const db = cleanup(readDb());
+      writeDb(db);
+      const session = normalizeArray(db.workSessions).map(normalizeWorkSession).find((item) => item.userId === userId && item.dateKey === dateKey);
+      return session || null;
+    },
+    async saveWorkSession(payload) {
+      const db = cleanup(readDb());
+      const existingIndex = normalizeArray(db.workSessions).findIndex((item) => item.id === payload.id || (item.userId === payload.userId && normalizeDate(item.dateKey) === normalizeDate(payload.dateKey)));
+      const base = existingIndex >= 0 ? normalizeWorkSession(db.workSessions[existingIndex]) : null;
+      const session = normalizeWorkSession({ ...base, ...payload, id: base?.id || payload.id, updatedAt: nowIso() });
+      if (existingIndex >= 0) {
+        db.workSessions[existingIndex] = session;
+      } else {
+        db.workSessions.unshift(session);
+      }
+      writeDb(db);
+      return session;
+    },
+    async listActivityLogs({ userId = '', limit = 50 } = {}) {
+      const db = cleanup(readDb());
+      writeDb(db);
+      let logs = normalizeArray(db.activityLogs).map(normalizeActivityLog).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+      if (userId) logs = logs.filter((item) => item.userId === userId);
+      return logs.slice(0, limit);
+    },
+    async createActivityLog(payload) {
+      const db = cleanup(readDb());
+      const log = normalizeActivityLog(payload);
+      db.activityLogs.unshift(log);
+      db.activityLogs = db.activityLogs.slice(0, 500);
+      writeDb(db);
+      return log;
+    },
     async createEmailToken({ userId, email, type, expiresHours = 24, meta = {} }) {
       const db = readDb();
       const rawToken = crypto.randomBytes(32).toString('hex');
@@ -734,6 +864,21 @@ function createPostgresAdapter() {
         [task.id, task.title, task.description, task.clientId || null, task.type, task.channel, task.format, task.assigneeId || null, JSON.stringify(task.assigneeIds || []), task.priority, task.status, task.dueDate || null, task.publishDate || null, task.approvalRequired, JSON.stringify(task.labels), JSON.stringify(task.checklist), JSON.stringify(task.subtasks || []), JSON.stringify(task.comments), task.createdById || null, task.createdAt, task.updatedAt]
       );
     }
+    for (const session of seed.workSessions.map(normalizeWorkSession)) {
+      await query(
+        `INSERT INTO work_sessions (id, user_id, date_key, check_in_at, check_out_at, status, focus_plan, end_summary, blockers, created_at, updated_at)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+         ON CONFLICT (user_id, date_key) DO NOTHING`,
+        [session.id, session.userId, session.dateKey, session.checkInAt || null, session.checkOutAt || null, session.status, session.focusPlan, session.endSummary, session.blockers, session.createdAt, session.updatedAt]
+      );
+    }
+    for (const log of seed.activityLogs.map(normalizeActivityLog)) {
+      await query(
+        `INSERT INTO activity_logs (id, user_id, kind, label, entity_type, entity_id, meta, created_at)
+         VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb,$8)`,
+        [log.id, log.userId || null, log.kind, log.label, log.entityType || null, log.entityId || null, JSON.stringify(log.meta || {}), log.createdAt]
+      );
+    }
   }
 
   function mapUserRow(row) {
@@ -802,6 +947,36 @@ function createPostgresAdapter() {
       mimeType: row.mime_type,
       sizeBytes: row.size_bytes,
       uploadedById: row.uploaded_by_id || '',
+      createdAt: row.created_at
+    });
+  }
+
+
+  function mapWorkSessionRow(row) {
+    return normalizeWorkSession({
+      id: row.id,
+      userId: row.user_id,
+      dateKey: row.date_key,
+      checkInAt: row.check_in_at || '',
+      checkOutAt: row.check_out_at || '',
+      status: row.status,
+      focusPlan: row.focus_plan || '',
+      endSummary: row.end_summary || '',
+      blockers: row.blockers || '',
+      createdAt: row.created_at,
+      updatedAt: row.updated_at
+    });
+  }
+
+  function mapActivityLogRow(row) {
+    return normalizeActivityLog({
+      id: row.id,
+      userId: row.user_id || '',
+      kind: row.kind,
+      label: row.label,
+      entityType: row.entity_type || '',
+      entityId: row.entity_id || '',
+      meta: row.meta || {},
       createdAt: row.created_at
     });
   }
@@ -896,6 +1071,30 @@ function createPostgresAdapter() {
           preview_link TEXT,
           created_at TIMESTAMPTZ NOT NULL
         );
+        CREATE TABLE IF NOT EXISTS work_sessions (
+          id TEXT PRIMARY KEY,
+          user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          date_key DATE NOT NULL,
+          check_in_at TIMESTAMPTZ,
+          check_out_at TIMESTAMPTZ,
+          status TEXT NOT NULL,
+          focus_plan TEXT,
+          end_summary TEXT,
+          blockers TEXT,
+          created_at TIMESTAMPTZ NOT NULL,
+          updated_at TIMESTAMPTZ NOT NULL,
+          UNIQUE(user_id, date_key)
+        );
+        CREATE TABLE IF NOT EXISTS activity_logs (
+          id TEXT PRIMARY KEY,
+          user_id TEXT REFERENCES users(id) ON DELETE SET NULL,
+          kind TEXT NOT NULL,
+          label TEXT NOT NULL,
+          entity_type TEXT,
+          entity_id TEXT,
+          meta JSONB NOT NULL DEFAULT '{}'::jsonb,
+          created_at TIMESTAMPTZ NOT NULL
+        );
         CREATE TABLE IF NOT EXISTS notification_settings (
           id TEXT PRIMARY KEY,
           settings JSONB NOT NULL DEFAULT '{}'::jsonb,
@@ -928,6 +1127,18 @@ function createPostgresAdapter() {
         query('SELECT * FROM clients ORDER BY name ASC'),
         currentUser.role === 'Admin' ? query('SELECT * FROM email_logs ORDER BY created_at DESC LIMIT 25') : Promise.resolve({ rows: [] })
       ]);
+      const workSessionsRes = await query(
+        currentUser.role === 'Admin'
+          ? 'SELECT * FROM work_sessions ORDER BY updated_at DESC LIMIT 120'
+          : 'SELECT * FROM work_sessions WHERE user_id = $1 ORDER BY updated_at DESC LIMIT 30',
+        currentUser.role === 'Admin' ? [] : [currentUser.id]
+      );
+      const activityLogsRes = await query(
+        currentUser.role === 'Admin'
+          ? 'SELECT * FROM activity_logs ORDER BY created_at DESC LIMIT 120'
+          : 'SELECT * FROM activity_logs WHERE user_id = $1 ORDER BY created_at DESC LIMIT 40',
+        currentUser.role === 'Admin' ? [] : [currentUser.id]
+      );
       return {
         brand: loadSeedData().brand,
         currentUser: sanitizeUser(currentUser),
@@ -944,6 +1155,8 @@ function createPostgresAdapter() {
           previewLink: row.preview_link,
           createdAt: row.created_at
         })),
+        workSessions: workSessionsRes.rows.map(mapWorkSessionRow),
+        activityLogs: activityLogsRes.rows.map(mapActivityLogRow),
         notificationSettings: await this.getNotificationSettings()
       };
     },
@@ -1125,6 +1338,43 @@ function createPostgresAdapter() {
         [event.id, event.kind, event.dedupeKey, event.taskId || null, event.userId || null, event.sentAt, JSON.stringify(event.meta || {}), event.createdAt]
       );
       return event;
+    },
+    async getWorkSessionForDate(userId, dateKey = todayDateKey()) {
+      const res = await query('SELECT * FROM work_sessions WHERE user_id=$1 AND date_key=$2 LIMIT 1', [userId, dateKey]);
+      return res.rows[0] ? mapWorkSessionRow(res.rows[0]) : null;
+    },
+    async saveWorkSession(payload) {
+      const base = payload.id ? await query('SELECT * FROM work_sessions WHERE id=$1 LIMIT 1', [payload.id]).then((res) => res.rows[0] ? mapWorkSessionRow(res.rows[0]) : null) : await this.getWorkSessionForDate(payload.userId, normalizeDate(payload.dateKey));
+      const session = normalizeWorkSession({ ...base, ...payload, id: base?.id || payload.id, updatedAt: nowIso() });
+      await query(
+        `INSERT INTO work_sessions (id, user_id, date_key, check_in_at, check_out_at, status, focus_plan, end_summary, blockers, created_at, updated_at)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+         ON CONFLICT (user_id, date_key) DO UPDATE SET
+           check_in_at = EXCLUDED.check_in_at,
+           check_out_at = EXCLUDED.check_out_at,
+           status = EXCLUDED.status,
+           focus_plan = EXCLUDED.focus_plan,
+           end_summary = EXCLUDED.end_summary,
+           blockers = EXCLUDED.blockers,
+           updated_at = EXCLUDED.updated_at`,
+        [session.id, session.userId, session.dateKey, session.checkInAt || null, session.checkOutAt || null, session.status, session.focusPlan, session.endSummary, session.blockers, session.createdAt, session.updatedAt]
+      );
+      return session;
+    },
+    async listActivityLogs({ userId = '', limit = 50 } = {}) {
+      const res = userId
+        ? await query('SELECT * FROM activity_logs WHERE user_id=$1 ORDER BY created_at DESC LIMIT $2', [userId, limit])
+        : await query('SELECT * FROM activity_logs ORDER BY created_at DESC LIMIT $1', [limit]);
+      return res.rows.map(mapActivityLogRow);
+    },
+    async createActivityLog(payload) {
+      const log = normalizeActivityLog(payload);
+      await query(
+        `INSERT INTO activity_logs (id, user_id, kind, label, entity_type, entity_id, meta, created_at)
+         VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb,$8)`,
+        [log.id, log.userId || null, log.kind, log.label, log.entityType || null, log.entityId || null, JSON.stringify(log.meta || {}), log.createdAt]
+      );
+      return log;
     },
     async createEmailToken({ userId, email, type, expiresHours = 24, meta = {} }) {
       const rawToken = crypto.randomBytes(32).toString('hex');
@@ -1375,6 +1625,24 @@ Abre tu panel: ${link}`;
 
 let reminderRunnerState = { running: false, lastRunAt: '', lastError: '' };
 
+async function safeLogActivity(payload = {}) {
+  try {
+    if (!payload.userId || typeof adapter?.createActivityLog !== 'function') return null;
+    return await adapter.createActivityLog({
+      userId: payload.userId,
+      kind: payload.kind || 'generic',
+      label: payload.label || 'Actividad registrada',
+      entityType: payload.entityType || '',
+      entityId: payload.entityId || '',
+      meta: payload.meta || {},
+      createdAt: payload.createdAt || nowIso()
+    });
+  } catch (error) {
+    console.error('No se pudo registrar actividad:', error.message);
+    return null;
+  }
+}
+
 async function maybeSendTaskAssignmentEmail(task, previousTask = null) {
   const settings = await adapter.getNotificationSettings();
   const currentIds = getTaskAssigneeIds(task);
@@ -1558,6 +1826,7 @@ app.post('/api/auth/login', async (req, res, next) => {
       await adapter.updateUser(user.id, { lastLoginAt: nowIso() });
     }
     setSessionCookie(res, token);
+    if (typeof adapter.createActivityLog === 'function') await adapter.createActivityLog({ userId: user.id, kind: 'login', label: 'Inició sesión en ZIA Flow.', entityType: 'session', entityId: user.id });
     res.json({ ok: true, user: sanitizeUser(await adapter.getUserById(user.id)) });
   } catch (error) {
     next(error);
@@ -1567,6 +1836,7 @@ app.post('/api/auth/login', async (req, res, next) => {
 app.post('/api/auth/logout', requireAuth, async (req, res, next) => {
   try {
     if (req.rawSessionToken) await adapter.deleteSession(req.rawSessionToken);
+    if (typeof adapter.createActivityLog === 'function') await adapter.createActivityLog({ userId: req.currentUser.id, kind: 'logout', label: 'Cerró sesión.', entityType: 'session', entityId: req.currentUser.id });
     clearSessionCookie(res);
     res.json({ ok: true });
   } catch (error) {
@@ -1634,6 +1904,7 @@ app.post('/api/auth/complete-token', async (req, res, next) => {
     const freshUser = await adapter.getUserById(result.user.id);
     const sessionToken = await adapter.createSession(freshUser.id);
     setSessionCookie(res, sessionToken);
+    if (typeof adapter.createActivityLog === 'function') await adapter.createActivityLog({ userId: freshUser.id, kind: 'login', label: 'Activó su cuenta e inició sesión.', entityType: 'session', entityId: freshUser.id });
     res.json({ ok: true, user: sanitizeUser(freshUser) });
   } catch (error) {
     next(error);
@@ -1663,6 +1934,7 @@ app.patch('/api/profile', requireAuth, async (req, res, next) => {
       return;
     }
     const updated = await adapter.updateUser(req.currentUser.id, { ...req.currentUser, name, email, updatedAt: nowIso() });
+    if (typeof adapter.createActivityLog === 'function') await adapter.createActivityLog({ userId: req.currentUser.id, kind: 'profile_update', label: 'Actualizó su perfil.', entityType: 'user', entityId: req.currentUser.id });
     res.json({ ok: true, user: updated });
   } catch (error) {
     next(error);
@@ -1683,7 +1955,84 @@ app.post('/api/profile/password', requireAuth, async (req, res, next) => {
       return;
     }
     await adapter.setUserPassword(req.currentUser.id, newPassword);
+    if (typeof adapter.createActivityLog === 'function') await adapter.createActivityLog({ userId: req.currentUser.id, kind: 'password_update', label: 'Cambió su contraseña.', entityType: 'user', entityId: req.currentUser.id });
     res.json({ ok: true });
+  } catch (error) {
+    next(error);
+  }
+});
+
+
+app.get('/api/work/session/today', requireAuth, async (req, res, next) => {
+  try {
+    const session = await adapter.getWorkSessionForDate(req.currentUser.id, todayDateKey());
+    res.json(session || null);
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.put('/api/work/session/today', requireAuth, async (req, res, next) => {
+  try {
+    const existing = await adapter.getWorkSessionForDate(req.currentUser.id, todayDateKey());
+    const session = await adapter.saveWorkSession({
+      ...(existing || {}),
+      userId: req.currentUser.id,
+      dateKey: todayDateKey(),
+      status: req.body.status || existing?.status || 'available',
+      focusPlan: req.body.focusPlan ?? existing?.focusPlan ?? '',
+      endSummary: req.body.endSummary ?? existing?.endSummary ?? '',
+      blockers: req.body.blockers ?? existing?.blockers ?? '',
+      checkInAt: existing?.checkInAt || '',
+      checkOutAt: existing?.checkOutAt || '',
+      updatedAt: nowIso()
+    });
+    if (typeof adapter.createActivityLog === 'function') await adapter.createActivityLog({ userId: req.currentUser.id, kind: 'session_update', label: 'Actualizó su jornada remota.', entityType: 'work_session', entityId: session.id, meta: { status: session.status } });
+    res.json({ ok: true, session });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post('/api/work/check-in', requireAuth, async (req, res, next) => {
+  try {
+    const existing = await adapter.getWorkSessionForDate(req.currentUser.id, todayDateKey());
+    const session = await adapter.saveWorkSession({
+      ...(existing || {}),
+      userId: req.currentUser.id,
+      dateKey: todayDateKey(),
+      checkInAt: existing?.checkInAt || nowIso(),
+      checkOutAt: existing?.checkOutAt || '',
+      status: req.body.status || existing?.status || 'available',
+      focusPlan: req.body.focusPlan ?? existing?.focusPlan ?? '',
+      endSummary: req.body.endSummary ?? existing?.endSummary ?? '',
+      blockers: req.body.blockers ?? existing?.blockers ?? '',
+      updatedAt: nowIso()
+    });
+    if (typeof adapter.createActivityLog === 'function') await adapter.createActivityLog({ userId: req.currentUser.id, kind: 'check_in', label: 'Marcó entrada remota.', entityType: 'work_session', entityId: session.id, meta: { status: session.status } });
+    res.json({ ok: true, session });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post('/api/work/check-out', requireAuth, async (req, res, next) => {
+  try {
+    const existing = await adapter.getWorkSessionForDate(req.currentUser.id, todayDateKey());
+    const session = await adapter.saveWorkSession({
+      ...(existing || {}),
+      userId: req.currentUser.id,
+      dateKey: todayDateKey(),
+      checkInAt: existing?.checkInAt || nowIso(),
+      checkOutAt: nowIso(),
+      status: req.body.status || 'offline',
+      focusPlan: req.body.focusPlan ?? existing?.focusPlan ?? '',
+      endSummary: req.body.endSummary ?? existing?.endSummary ?? '',
+      blockers: req.body.blockers ?? existing?.blockers ?? '',
+      updatedAt: nowIso()
+    });
+    if (typeof adapter.createActivityLog === 'function') await adapter.createActivityLog({ userId: req.currentUser.id, kind: 'check_out', label: 'Marcó salida remota.', entityType: 'work_session', entityId: session.id, meta: { status: session.status } });
+    res.json({ ok: true, session });
   } catch (error) {
     next(error);
   }
@@ -1704,6 +2053,7 @@ app.post('/api/tasks', requireAuth, async (req, res, next) => {
     delete payload.id;
     const task = await adapter.saveTask(payload);
     await maybeSendTaskAssignmentEmail(task, null);
+    if (typeof adapter.createActivityLog === 'function') await adapter.createActivityLog({ userId: req.currentUser.id, kind: 'task_create', label: `Creó la tarea "${task.title}".`, entityType: 'task', entityId: task.id, meta: { status: task.status } });
     res.status(201).json(task);
   } catch (error) {
     next(error);
@@ -1719,6 +2069,7 @@ app.patch('/api/tasks/:id', requireAuth, async (req, res, next) => {
       return;
     }
     await maybeSendTaskAssignmentEmail(task, previousTask);
+    if (typeof adapter.createActivityLog === 'function') await adapter.createActivityLog({ userId: req.currentUser.id, kind: 'task_update', label: `Actualizó la tarea "${task.title}".`, entityType: 'task', entityId: task.id, meta: { status: task.status } });
     res.json(task);
   } catch (error) {
     next(error);
@@ -1727,11 +2078,13 @@ app.patch('/api/tasks/:id', requireAuth, async (req, res, next) => {
 
 app.delete('/api/tasks/:id', requireAuth, async (req, res, next) => {
   try {
+    const previousTask = await adapter.getBootstrap(req.currentUser).then((data) => data.tasks.find((item) => item.id === req.params.id) || null);
     const result = await adapter.deleteTask(req.params.id);
     if (!result.ok) {
       res.status(404).json({ error: 'Tarea no encontrada.' });
       return;
     }
+    if (typeof adapter.createActivityLog === 'function') await adapter.createActivityLog({ userId: req.currentUser.id, kind: 'task_delete', label: `Eliminó la tarea "${previousTask?.title || req.params.id}".`, entityType: 'task', entityId: req.params.id });
     res.json({ ok: true });
   } catch (error) {
     next(error);
@@ -1752,6 +2105,7 @@ app.post('/api/tasks/:id/attachments', requireAuth, upload.single('file'), async
       return;
     }
     const attachment = await adapter.createAttachment(req.params.id, req.file, req.currentUser.id);
+    if (typeof adapter.createActivityLog === 'function') await adapter.createActivityLog({ userId: req.currentUser.id, kind: 'attachment_upload', label: `Subió un adjunto a "${task.title}".`, entityType: 'attachment', entityId: attachment.id, meta: { taskId: task.id } });
     res.status(201).json(attachment);
   } catch (error) {
     next(error);
@@ -1783,6 +2137,7 @@ app.delete('/api/attachments/:id', requireAuth, async (req, res, next) => {
       res.status(404).json({ error: 'Adjunto no encontrado.' });
       return;
     }
+    if (typeof adapter.createActivityLog === 'function') await adapter.createActivityLog({ userId: req.currentUser.id, kind: 'attachment_delete', label: 'Eliminó un adjunto.', entityType: 'attachment', entityId: req.params.id });
     res.json({ ok: true });
   } catch (error) {
     next(error);
