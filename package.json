@@ -1,0 +1,19 @@
+{
+  "name": "zia-flow",
+  "version": "1.0.0",
+  "private": true,
+  "description": "ZIA Flow - gestor visual de tareas y contenido para agencia.",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "express": "^5.2.1",
+    "multer": "^2.1.1",
+    "nodemailer": "^8.0.5",
+    "pg": "^8.20.0"
+  }
+}

@@ -1,0 +1,549 @@
+{
+  "brand": {
+    "name": "ZIA Flow",
+    "subtitle": "Agency Workspace"
+  },
+  "users": [
+    {
+      "id": "u1",
+      "name": "Zia",
+      "email": "zia@agency.local",
+      "role": "Admin",
+      "accent": "admin",
+      "status": "active",
+      "passwordHash": "277555513ae80b3ade2e1fb72c0c8aa2$fc73eb19d7247b1b5447799ebe594b51943c28543a12512930e62d926bca842b88fc79a54c622046e3b7efe651cee20bc4c36701803a5329e707db29b0d2f176",
+      "createdAt": "2026-04-20T02:50:42.726Z",
+      "updatedAt": "2026-04-20T04:11:53.423Z",
+      "lastLoginAt": "2026-04-20T04:11:53.129Z"
+    },
+    {
+      "id": "u2",
+      "name": "Emely",
+      "email": "emely@agency.local",
+      "role": "Content Manager",
+      "accent": "content",
+      "status": "active",
+      "passwordHash": "80762f8b6defb98d00f43b0410540780$cc7fef71e07f020797e29950ab685f5588feb91922fa4813fcea028c9614d0eb1ae7ba36874bba35cf65f957cd5b6ab3ab08e6674c2f8e5c012b95267fbd9afa",
+      "createdAt": "2026-04-20T02:50:42.849Z",
+      "updatedAt": "2026-04-20T02:52:43.636Z",
+      "lastLoginAt": ""
+    },
+    {
+      "id": "u3",
+      "name": "Franny",
+      "email": "franny@agency.local",
+      "role": "Designer",
+      "accent": "design",
+      "status": "active",
+      "passwordHash": "cc3c475f441e85c0831594d7efc6ae74$a02aecc5543785900cfa385631084c697c589296cff56a905adf7e16eabe0662f23a622cb1ad4a7481572f2cdedcbd1406ce0a982a16522cbb20b77ef8ea0fc7",
+      "createdAt": "2026-04-20T02:50:42.944Z",
+      "updatedAt": "2026-04-20T02:52:43.636Z",
+      "lastLoginAt": ""
+    },
+    {
+      "id": "u4",
+      "name": "Jhofrankny",
+      "email": "jh@agency.local",
+      "role": "Developer",
+      "accent": "dev",
+      "status": "active",
+      "passwordHash": "7469d9cc342e417a2b3599cc94483bfc$8562e6700797ba1e261c5773002c68bf0bb7ed3cad2bcba5f0ae76f4bb43ca7b05eee8bdb0c282998f8e1c37c0f8c2645f37c3224cc12936bba8c92bb0841d8c",
+      "createdAt": "2026-04-20T02:50:43.042Z",
+      "updatedAt": "2026-04-20T02:52:43.636Z",
+      "lastLoginAt": ""
+    },
+    {
+      "id": "u5",
+      "name": "Andrea",
+      "email": "andrea@agency.local",
+      "role": "Video Editor",
+      "accent": "video",
+      "status": "active",
+      "passwordHash": "219a61c30b9629493c62f6d19e8dbd4a$e4f6a39dcaa98db93d81be4fd0aba1a534710a4cb3b5747628d961c42c6ef1d44477ab388d20622ad715279966a699eeaf0d2b63ce5b4766acf55b6fcdc09bb3",
+      "createdAt": "2026-04-20T02:50:43.142Z",
+      "updatedAt": "2026-04-20T02:52:43.636Z",
+      "lastLoginAt": ""
+    }
+  ],
+  "clients": [
+    {
+      "id": "c1",
+      "name": "Terramarine",
+      "handle": "@terramarine.rd",
+      "service": "Gestión de redes + campañas",
+      "plan": "Mensual",
+      "status": "Activo",
+      "ownerId": "u2",
+      "channels": [
+        "Instagram",
+        "Facebook",
+        "TikTok"
+      ],
+      "notes": "Enfoque en paquetes y experiencias premium.",
+      "createdAt": "2026-04-20T02:50:43.142Z",
+      "updatedAt": "2026-04-20T02:52:43.636Z"
+    },
+    {
+      "id": "c2",
+      "name": "Eves Dental Studio",
+      "handle": "@evesdentalstudio",
+      "service": "Contenido + diseño",
+      "plan": "Mensual",
+      "status": "Activo",
+      "ownerId": "u3",
+      "channels": [
+        "Instagram",
+        "Facebook"
+      ],
+      "notes": "Contenido educativo y testimoniales.",
+      "createdAt": "2026-04-20T02:50:43.142Z",
+      "updatedAt": "2026-04-20T02:52:43.636Z"
+    },
+    {
+      "id": "c3",
+      "name": "Oso Pack Courier",
+      "handle": "@osopackrd",
+      "service": "Contenido + promociones",
+      "plan": "Mensual",
+      "status": "Activo",
+      "ownerId": "u2",
+      "channels": [
+        "Instagram",
+        "Facebook",
+        "WhatsApp"
+      ],
+      "notes": "Mantener línea visual clara y tono confiable.",
+      "createdAt": "2026-04-20T02:50:43.142Z",
+      "updatedAt": "2026-04-20T02:52:43.636Z"
+    },
+    {
+      "id": "c4",
+      "name": "TekkoCode",
+      "handle": "@tekkocode",
+      "service": "Branding + captación",
+      "plan": "Interno",
+      "status": "Interno",
+      "ownerId": "u1",
+      "channels": [
+        "Instagram",
+        "LinkedIn",
+        "Website"
+      ],
+      "notes": "Generar leads de desarrollo web y automatizaciones.",
+      "createdAt": "2026-04-20T02:50:43.143Z",
+      "updatedAt": "2026-04-20T02:52:43.636Z"
+    }
+  ],
+  "tasks": [
+    {
+      "id": "t_0b2b6d56bf24",
+      "title": "Test assign email",
+      "description": "",
+      "clientId": "c1",
+      "type": "Post",
+      "channel": "Instagram",
+      "format": "",
+      "assigneeId": "u2",
+      "priority": "Alta",
+      "status": "brief",
+      "dueDate": "2026-04-20",
+      "publishDate": "",
+      "approvalRequired": false,
+      "labels": [],
+      "checklist": [],
+      "comments": [],
+      "createdById": "u1",
+      "createdAt": "2026-04-20T04:12:45.682Z",
+      "updatedAt": "2026-04-20T04:12:45.539Z"
+    },
+    {
+      "id": "t_cb0c5ce7f72c",
+      "title": "Test assign email",
+      "description": "",
+      "clientId": "c1",
+      "type": "Post",
+      "channel": "Instagram",
+      "format": "",
+      "assigneeId": "u2",
+      "priority": "Alta",
+      "status": "brief",
+      "dueDate": "2026-04-20",
+      "publishDate": "",
+      "approvalRequired": false,
+      "labels": [],
+      "checklist": [],
+      "comments": [],
+      "createdById": "u1",
+      "createdAt": "2026-04-20T04:12:32.476Z",
+      "updatedAt": "2026-04-20T04:12:32.137Z"
+    },
+    {
+      "id": "t1",
+      "title": "Reel promo Semana Santa",
+      "description": "Crear idea, guion corto y edición para paquete de fin de semana.",
+      "clientId": "c1",
+      "type": "Reel",
+      "channel": "Instagram",
+      "format": "Vertical 9:16",
+      "assigneeId": "u5",
+      "priority": "Alta",
+      "status": "design",
+      "dueDate": "2026-04-21",
+      "publishDate": "2026-04-22",
+      "approvalRequired": true,
+      "labels": [
+        "venta",
+        "video"
+      ],
+      "checklist": [
+        {
+          "id": "cl1",
+          "text": "Hook del video",
+          "done": true
+        },
+        {
+          "id": "cl2",
+          "text": "Edición y subtítulos",
+          "done": false
+        },
+        {
+          "id": "cl3",
+          "text": "Portada",
+          "done": false
+        }
+      ],
+      "comments": [
+        {
+          "id": "cm1",
+          "authorId": "u2",
+          "text": "Usar enfoque más aspiracional y premium.",
+          "createdAt": "2026-04-18T14:20:00.000Z"
+        }
+      ],
+      "createdById": "",
+      "createdAt": "2026-04-18T14:00:00.000Z",
+      "updatedAt": "2026-04-20T02:52:43.637Z"
+    },
+    {
+      "id": "t2",
+      "title": "Carrusel: 5 señales de bruxismo",
+      "description": "Copy educativo y diseño con CTA a evaluación.",
+      "clientId": "c2",
+      "type": "Carrusel",
+      "channel": "Instagram",
+      "format": "1080x1350",
+      "assigneeId": "u3",
+      "priority": "Media",
+      "status": "review",
+      "dueDate": "2026-04-20",
+      "publishDate": "2026-04-21",
+      "approvalRequired": true,
+      "labels": [
+        "educativo",
+        "diseño"
+      ],
+      "checklist": [
+        {
+          "id": "cl4",
+          "text": "Copy final",
+          "done": true
+        },
+        {
+          "id": "cl5",
+          "text": "Diseño aprobado interno",
+          "done": true
+        }
+      ],
+      "comments": [
+        {
+          "id": "cm2",
+          "authorId": "u1",
+          "text": "Buen rumbo. Subir un poco el tamaño del CTA.",
+          "createdAt": "2026-04-19T10:05:00.000Z"
+        }
+      ],
+      "createdById": "",
+      "createdAt": "2026-04-17T17:00:00.000Z",
+      "updatedAt": "2026-04-20T02:52:43.637Z"
+    },
+    {
+      "id": "t3",
+      "title": "Historias promo de libras",
+      "description": "Set de 4 stories con foco en rapidez y precio por libra.",
+      "clientId": "c3",
+      "type": "Stories",
+      "channel": "Instagram",
+      "format": "1080x1920",
+      "assigneeId": "u2",
+      "priority": "Alta",
+      "status": "copy",
+      "dueDate": "2026-04-20",
+      "publishDate": "2026-04-20",
+      "approvalRequired": false,
+      "labels": [
+        "stories",
+        "promo"
+      ],
+      "checklist": [
+        {
+          "id": "cl6",
+          "text": "Copy inicial",
+          "done": false
+        },
+        {
+          "id": "cl7",
+          "text": "Idea visual",
+          "done": false
+        }
+      ],
+      "comments": [],
+      "createdById": "",
+      "createdAt": "2026-04-19T08:00:00.000Z",
+      "updatedAt": "2026-04-20T02:52:43.637Z"
+    },
+    {
+      "id": "t4",
+      "title": "Landing captación TekkoCode",
+      "description": "Actualizar hero, CTA y casos de uso para agencias y eCommerce.",
+      "clientId": "c4",
+      "type": "Web",
+      "channel": "Website",
+      "format": "Landing",
+      "assigneeId": "u4",
+      "priority": "Alta",
+      "status": "doing",
+      "dueDate": "2026-04-25",
+      "publishDate": "2026-04-26",
+      "approvalRequired": true,
+      "labels": [
+        "dev",
+        "captación"
+      ],
+      "checklist": [
+        {
+          "id": "cl8",
+          "text": "Nuevo layout",
+          "done": true
+        },
+        {
+          "id": "cl9",
+          "text": "Formulario conectado",
+          "done": false
+        }
+      ],
+      "comments": [],
+      "createdById": "",
+      "createdAt": "2026-04-16T12:00:00.000Z",
+      "updatedAt": "2026-04-20T02:52:43.637Z"
+    },
+    {
+      "id": "t5",
+      "title": "Calendario mensual mayo",
+      "description": "Definir ideas, pilares y distribución de contenido mensual.",
+      "clientId": "c1",
+      "type": "Estrategia",
+      "channel": "General",
+      "format": "Documento",
+      "assigneeId": "u2",
+      "priority": "Media",
+      "status": "brief",
+      "dueDate": "2026-04-24",
+      "publishDate": "2026-04-28",
+      "approvalRequired": true,
+      "labels": [
+        "estrategia"
+      ],
+      "checklist": [],
+      "comments": [],
+      "createdById": "",
+      "createdAt": "2026-04-19T12:00:00.000Z",
+      "updatedAt": "2026-04-20T02:52:43.637Z"
+    },
+    {
+      "id": "t6",
+      "title": "Post publicado: implantes",
+      "description": "Pieza ya entregada y publicada.",
+      "clientId": "c2",
+      "type": "Post",
+      "channel": "Facebook",
+      "format": "1080x1080",
+      "assigneeId": "u3",
+      "priority": "Baja",
+      "status": "published",
+      "dueDate": "2026-04-15",
+      "publishDate": "2026-04-15",
+      "approvalRequired": false,
+      "labels": [
+        "publicado"
+      ],
+      "checklist": [],
+      "comments": [],
+      "createdById": "",
+      "createdAt": "2026-04-13T12:00:00.000Z",
+      "updatedAt": "2026-04-20T02:52:43.637Z"
+    }
+  ],
+  "attachments": [],
+  "sessions": [
+    {
+      "id": "s_cc2ab2a28c88",
+      "userId": "u1",
+      "tokenHash": "ea75172763ab29eb023008b89194e82d467298a976ae49c3474b1d286fa2e085",
+      "createdAt": "2026-04-20T04:11:53.129Z",
+      "expiresAt": "2026-05-20T04:11:53.129Z"
+    }
+  ],
+  "emailTokens": [],
+  "emailLogs": [
+    {
+      "id": "mail_25a15e19820e",
+      "toEmail": "andrea@agency.local",
+      "subject": "Recordatorio: Reel promo Semana Santa vence pronto",
+      "textBody": "Hola Andrea,\n\nTu tarea \"Reel promo Semana Santa\" vence en 1 día.\nCliente: Terramarine\nEstado actual: design\nFecha límite: 2026-04-21\n\nEntra a ZIA Flow: http://127.0.0.1:3101",
+      "htmlBody": "<p>Hola <strong>Andrea</strong>,</p><p>Tu tarea <strong>Reel promo Semana Santa</strong> vence en 1 día.</p><ul><li><strong>Cliente:</strong> Terramarine</li><li><strong>Estado actual:</strong> design</li><li><strong>Fecha límite:</strong> 2026-04-21</li></ul><p><a href=\"http://127.0.0.1:3101\">Abrir ZIA Flow</a></p>",
+      "mode": "log",
+      "previewLink": "http://127.0.0.1:3101",
+      "createdAt": "2026-04-20T04:13:36.441Z"
+    },
+    {
+      "id": "mail_bc081134934e",
+      "toEmail": "franny@agency.local",
+      "subject": "Recordatorio: Carrusel: 5 señales de bruxismo vence pronto",
+      "textBody": "Hola Franny,\n\nTu tarea \"Carrusel: 5 señales de bruxismo\" vence hoy.\nCliente: Eves Dental Studio\nEstado actual: review\nFecha límite: 2026-04-20\n\nEntra a ZIA Flow: http://127.0.0.1:3101",
+      "htmlBody": "<p>Hola <strong>Franny</strong>,</p><p>Tu tarea <strong>Carrusel: 5 señales de bruxismo</strong> vence hoy.</p><ul><li><strong>Cliente:</strong> Eves Dental Studio</li><li><strong>Estado actual:</strong> review</li><li><strong>Fecha límite:</strong> 2026-04-20</li></ul><p><a href=\"http://127.0.0.1:3101\">Abrir ZIA Flow</a></p>",
+      "mode": "log",
+      "previewLink": "http://127.0.0.1:3101",
+      "createdAt": "2026-04-20T04:13:33.156Z"
+    },
+    {
+      "id": "mail_6e2e2b24a7cd",
+      "toEmail": "emely@agency.local",
+      "subject": "Recordatorio: Historias promo de libras vence pronto",
+      "textBody": "Hola Emely,\n\nTu tarea \"Historias promo de libras\" vence hoy.\nCliente: Oso Pack Courier\nEstado actual: copy\nFecha límite: 2026-04-20\n\nEntra a ZIA Flow: http://127.0.0.1:3101",
+      "htmlBody": "<p>Hola <strong>Emely</strong>,</p><p>Tu tarea <strong>Historias promo de libras</strong> vence hoy.</p><ul><li><strong>Cliente:</strong> Oso Pack Courier</li><li><strong>Estado actual:</strong> copy</li><li><strong>Fecha límite:</strong> 2026-04-20</li></ul><p><a href=\"http://127.0.0.1:3101\">Abrir ZIA Flow</a></p>",
+      "mode": "log",
+      "previewLink": "http://127.0.0.1:3101",
+      "createdAt": "2026-04-20T04:13:29.778Z"
+    },
+    {
+      "id": "mail_4b0de3269fa4",
+      "toEmail": "emely@agency.local",
+      "subject": "Recordatorio: Test assign email vence pronto",
+      "textBody": "Hola Emely,\n\nTu tarea \"Test assign email\" vence hoy.\nCliente: Terramarine\nEstado actual: brief\nFecha límite: 2026-04-20\n\nEntra a ZIA Flow: http://127.0.0.1:3101",
+      "htmlBody": "<p>Hola <strong>Emely</strong>,</p><p>Tu tarea <strong>Test assign email</strong> vence hoy.</p><ul><li><strong>Cliente:</strong> Terramarine</li><li><strong>Estado actual:</strong> brief</li><li><strong>Fecha límite:</strong> 2026-04-20</li></ul><p><a href=\"http://127.0.0.1:3101\">Abrir ZIA Flow</a></p>",
+      "mode": "log",
+      "previewLink": "http://127.0.0.1:3101",
+      "createdAt": "2026-04-20T04:13:26.347Z"
+    },
+    {
+      "id": "mail_18f4ca44c2dc",
+      "toEmail": "emely@agency.local",
+      "subject": "Recordatorio: Test assign email vence pronto",
+      "textBody": "Hola Emely,\n\nTu tarea \"Test assign email\" vence hoy.\nCliente: Terramarine\nEstado actual: brief\nFecha límite: 2026-04-20\n\nEntra a ZIA Flow: http://127.0.0.1:3101",
+      "htmlBody": "<p>Hola <strong>Emely</strong>,</p><p>Tu tarea <strong>Test assign email</strong> vence hoy.</p><ul><li><strong>Cliente:</strong> Terramarine</li><li><strong>Estado actual:</strong> brief</li><li><strong>Fecha límite:</strong> 2026-04-20</li></ul><p><a href=\"http://127.0.0.1:3101\">Abrir ZIA Flow</a></p>",
+      "mode": "log",
+      "previewLink": "http://127.0.0.1:3101",
+      "createdAt": "2026-04-20T04:13:22.870Z"
+    },
+    {
+      "id": "mail_362c50dfaef1",
+      "toEmail": "emely@agency.local",
+      "subject": "Nueva tarea asignada: Test assign email",
+      "textBody": "Hola Emely,\n\nSe te asignó una tarea en ZIA Flow.\n\nTarea: Test assign email\nCliente: Terramarine\nEstado: brief\nFecha límite: 2026-04-20\n\nAbre tu panel aquí: http://127.0.0.1:3101",
+      "htmlBody": "<p>Hola <strong>Emely</strong>,</p><p>Se te asignó una tarea en <strong>ZIA Flow</strong>.</p><ul><li><strong>Tarea:</strong> Test assign email</li><li><strong>Cliente:</strong> Terramarine</li><li><strong>Estado:</strong> brief</li><li><strong>Fecha límite:</strong> 2026-04-20</li></ul><p><a href=\"http://127.0.0.1:3101\">Abrir ZIA Flow</a></p>",
+      "mode": "log",
+      "previewLink": "http://127.0.0.1:3101",
+      "createdAt": "2026-04-20T04:12:49.011Z"
+    },
+    {
+      "id": "mail_362986ae66ea",
+      "toEmail": "emely@agency.local",
+      "subject": "Nueva tarea asignada: Test assign email",
+      "textBody": "Hola Emely,\n\nSe te asignó una tarea en ZIA Flow.\n\nTarea: Test assign email\nCliente: Terramarine\nEstado: brief\nFecha límite: 2026-04-20\n\nAbre tu panel aquí: http://127.0.0.1:3101",
+      "htmlBody": "<p>Hola <strong>Emely</strong>,</p><p>Se te asignó una tarea en <strong>ZIA Flow</strong>.</p><ul><li><strong>Tarea:</strong> Test assign email</li><li><strong>Cliente:</strong> Terramarine</li><li><strong>Estado:</strong> brief</li><li><strong>Fecha límite:</strong> 2026-04-20</li></ul><p><a href=\"http://127.0.0.1:3101\">Abrir ZIA Flow</a></p>",
+      "mode": "log",
+      "previewLink": "http://127.0.0.1:3101",
+      "createdAt": "2026-04-20T04:12:36.749Z"
+    }
+  ],
+  "notificationSettings": {
+    "enabled": true,
+    "timezone": "America/Santo_Domingo",
+    "assignmentEmails": true,
+    "dailyDigestEnabled": true,
+    "dailyDigestHour": 8,
+    "dueSoonEnabled": true,
+    "dueSoonHours": 24,
+    "overdueEnabled": true,
+    "overdueRepeatHours": 24,
+    "weekendDigest": true,
+    "updatedAt": "2026-04-20T04:11:04.806Z"
+  },
+  "reminderEvents": [
+    {
+      "id": "re_1a41ed18e218",
+      "kind": "due_soon",
+      "dedupeKey": "due_soon:t1:u5:2026-04-21",
+      "taskId": "t1",
+      "userId": "u5",
+      "sentAt": "2026-04-20T04:13:38.005Z",
+      "meta": {
+        "daysLeft": 1,
+        "triggeredBy": "zia@agency.local"
+      },
+      "createdAt": "2026-04-20T04:13:38.005Z"
+    },
+    {
+      "id": "re_fb7dccc01337",
+      "kind": "due_soon",
+      "dedupeKey": "due_soon:t2:u3:2026-04-20",
+      "taskId": "t2",
+      "userId": "u3",
+      "sentAt": "2026-04-20T04:13:34.659Z",
+      "meta": {
+        "daysLeft": 0,
+        "triggeredBy": "zia@agency.local"
+      },
+      "createdAt": "2026-04-20T04:13:34.659Z"
+    },
+    {
+      "id": "re_eb6ae24963b4",
+      "kind": "due_soon",
+      "dedupeKey": "due_soon:t3:u2:2026-04-20",
+      "taskId": "t3",
+      "userId": "u2",
+      "sentAt": "2026-04-20T04:13:31.288Z",
+      "meta": {
+        "daysLeft": 0,
+        "triggeredBy": "zia@agency.local"
+      },
+      "createdAt": "2026-04-20T04:13:31.288Z"
+    },
+    {
+      "id": "re_09c2ac6900e5",
+      "kind": "due_soon",
+      "dedupeKey": "due_soon:t_cb0c5ce7f72c:u2:2026-04-20",
+      "taskId": "t_cb0c5ce7f72c",
+      "userId": "u2",
+      "sentAt": "2026-04-20T04:13:27.914Z",
+      "meta": {
+        "daysLeft": 0,
+        "triggeredBy": "zia@agency.local"
+      },
+      "createdAt": "2026-04-20T04:13:27.914Z"
+    },
+    {
+      "id": "re_7ca78d64fd53",
+      "kind": "due_soon",
+      "dedupeKey": "due_soon:t_0b2b6d56bf24:u2:2026-04-20",
+      "taskId": "t_0b2b6d56bf24",
+      "userId": "u2",
+      "sentAt": "2026-04-20T04:13:24.477Z",
+      "meta": {
+        "daysLeft": 0,
+        "triggeredBy": "zia@agency.local"
+      },
+      "createdAt": "2026-04-20T04:13:24.477Z"
+    }
+  ]
+}

@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ZIA Flow</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="grain"></div>
+
+    <section class="auth-shell" id="authShell">
+      <div class="auth-card auth-side">
+        <div class="brand-block auth-brand-block">
+          <div class="brand-mark">
+            <span class="brand-zia">zia</span>
+            <span class="brand-lab">LAB</span>
+          </div>
+          <p class="brand-subtitle">Flow workspace para agencia</p>
+        </div>
+
+        <div class="auth-copy">
+          <p class="eyebrow">Gestión de agencia</p>
+          <h1>Un tablero visual para contenido, clientes, usuarios y aprobaciones</h1>
+          <p class="small-text">Estilo ZIA inspirado en Trello + Monday, con PostgreSQL, adjuntos, recuperación de contraseña e invitaciones por email.</p>
+        </div>
+
+        <div class="hint-card">
+          <strong>Demo inicial</strong>
+          <span>Correo: <code>zia@agency.local</code></span>
+          <span>Clave: <code>ZiaFlow2026!</code></span>
+        </div>
+      </div>
+
+      <div class="auth-card auth-main">
+        <div class="auth-tabs">
+          <button class="auth-tab active" data-auth-view="login">Entrar</button>
+          <button class="auth-tab" data-auth-view="forgot">Recuperar clave</button>
+        </div>
+
+        <form class="stack-form auth-view active" id="loginView">
+          <label class="field">
+            <span>Correo</span>
+            <input id="loginEmail" type="email" placeholder="zia@agency.local" required />
+          </label>
+          <label class="field">
+            <span>Contraseña</span>
+            <input id="loginPassword" type="password" placeholder="••••••••" required />
+          </label>
+          <button class="primary-button" type="submit">Entrar a ZIA Flow</button>
+        </form>
+
+        <form class="stack-form auth-view" id="forgotView">
+          <label class="field">
+            <span>Correo de la cuenta</span>
+            <input id="forgotEmail" type="email" placeholder="equipo@zialab.com" required />
+          </label>
+          <button class="primary-button" type="submit">Enviar enlace</button>
+          <p class="small-text">Si el SMTP no está configurado todavía, el sistema mostrará el enlace de prueba para abrirlo de inmediato.</p>
+        </form>
+
+        <form class="stack-form auth-view" id="tokenView">
+          <div id="tokenIntro" class="hint-card no-top"></div>
+          <label class="field" id="tokenNameFieldWrap">
+            <span>Nombre</span>
+            <input id="tokenName" type="text" placeholder="Tu nombre" />
+          </label>
+          <label class="field">
+            <span>Nueva contraseña</span>
+            <input id="tokenPassword" type="password" minlength="8" placeholder="Mínimo 8 caracteres" required />
+          </label>
+          <button class="primary-button" type="submit" id="tokenButton">Guardar y entrar</button>
+        </form>
+      </div>
+    </section>
+
+    <div class="app-shell hidden" id="appShell">
+      <aside class="sidebar">
+        <div class="brand-block">
+          <div class="brand-mark">
+            <span class="brand-zia">zia</span>
+            <span class="brand-lab">LAB</span>
+          </div>
+          <p class="brand-subtitle">Flow workspace para agencia</p>
+        </div>
+
+        <nav class="nav" id="navTabs">
+          <button class="nav-item active" data-tab="dashboard">Dashboard</button>
+          <button class="nav-item" data-tab="tasks">Tablero</button>
+          <button class="nav-item" data-tab="calendar">Calendario</button>
+          <button class="nav-item" data-tab="clients">Clientes</button>
+          <button class="nav-item" data-tab="profile">Mi perfil</button>
+          <button class="nav-item hidden" data-tab="admin" id="adminNavButton">Admin</button>
+        </nav>
+
+        <div class="sidebar-panel">
+          <h3>Resumen rápido</h3>
+          <ul class="mini-list" id="sidebarQuickStats"></ul>
+        </div>
+      </aside>
+
+      <main class="main-content">
+        <header class="topbar">
+          <div>
+            <p class="eyebrow" id="topbarEyebrow">ZIA Lab</p>
+            <h1 id="pageTitle">Dashboard</h1>
+          </div>
+          <div class="topbar-actions">
+            <button class="ghost-button" id="newClientButton">Nuevo cliente</button>
+            <button class="ghost-button" id="newUserButton">Nuevo usuario</button>
+            <button class="primary-button" id="newTaskButton">Nueva tarea</button>
+            <button class="ghost-button" id="logoutButton">Salir</button>
+          </div>
+        </header>
+
+        <section class="toolbar" id="toolbarSection">
+          <div class="toolbar-filters">
+            <label class="field compact search-field">
+              <span>Buscar</span>
+              <input id="globalSearch" type="search" placeholder="Buscar tarea o cliente" />
+            </label>
+            <label class="field compact">
+              <span>Cliente</span>
+              <select id="clientFilter"></select>
+            </label>
+            <label class="field compact">
+              <span>Responsable</span>
+              <select id="assigneeFilter"></select>
+            </label>
+            <label class="field compact">
+              <span>Prioridad</span>
+              <select id="priorityFilter">
+                <option value="all">Todas</option>
+                <option value="Alta">Alta</option>
+                <option value="Media">Media</option>
+                <option value="Baja">Baja</option>
+              </select>
+            </label>
+          </div>
+
+          <div class="toolbar-actions">
+            <div class="segmented" id="taskViewToggle">
+              <button type="button" class="active" data-view="board">Kanban</button>
+              <button type="button" data-view="table">Tabla</button>
+            </div>
+          </div>
+        </section>
+
+        <section id="workspace"></section>
+      </main>
+    </div>
+
+    <div class="modal-backdrop hidden" id="taskModalBackdrop">
+      <div class="modal-card modal-large">
+        <div class="modal-header">
+          <div>
+            <p class="eyebrow">Tareas</p>
+            <h3 id="taskModalTitle">Nueva tarea</h3>
+          </div>
+          <button class="close-button" data-close-modal="task">✕</button>
+        </div>
+        <form class="stack-form" id="taskForm">
+          <input type="hidden" id="taskId" />
+          <div class="form-grid two-columns">
+            <label class="field">
+              <span>Título</span>
+              <input id="taskTitle" required />
+            </label>
+            <label class="field">
+              <span>Cliente</span>
+              <select id="taskClient"></select>
+            </label>
+            <label class="field full-row">
+              <span>Descripción</span>
+              <textarea id="taskDescription" rows="3"></textarea>
+            </label>
+            <label class="field">
+              <span>Tipo</span>
+              <input id="taskType" placeholder="Reel, Post, Historia, Web..." />
+            </label>
+            <label class="field">
+              <span>Canal</span>
+              <input id="taskChannel" placeholder="Instagram, Facebook, Web..." />
+            </label>
+            <label class="field">
+              <span>Formato</span>
+              <input id="taskFormat" placeholder="1080x1350, Vertical 9:16..." />
+            </label>
+            <label class="field">
+              <span>Responsable</span>
+              <select id="taskAssignee"></select>
+            </label>
+            <label class="field">
+              <span>Prioridad</span>
+              <select id="taskPriority">
+                <option>Alta</option>
+                <option selected>Media</option>
+                <option>Baja</option>
+              </select>
+            </label>
+            <label class="field">
+              <span>Estado</span>
+              <select id="taskStatus"></select>
+            </label>
+            <label class="field">
+              <span>Fecha de entrega</span>
+              <input id="taskDueDate" type="date" />
+            </label>
+            <label class="field">
+              <span>Fecha de publicación</span>
+              <input id="taskPublishDate" type="date" />
+            </label>
+            <label class="field checkbox-field">
+              <span>Requiere aprobación</span>
+              <input id="taskApproval" type="checkbox" />
+            </label>
+            <label class="field full-row">
+              <span>Etiquetas</span>
+              <input id="taskLabels" placeholder="venta, video, urgente" />
+            </label>
+            <label class="field full-row">
+              <span>Checklist (una línea por punto)</span>
+              <textarea id="taskChecklist" rows="4"></textarea>
+            </label>
+            <label class="field full-row">
+              <span>Comentario nuevo</span>
+              <textarea id="taskComment" rows="3" placeholder="Nota interna adicional"></textarea>
+            </label>
+          </div>
+
+          <div class="panel inner-panel">
+            <div class="panel-header compact-head">
+              <div>
+                <h4 class="panel-title no-margin">Adjuntos</h4>
+                <p class="small-text">Sube propuestas, briefs, artes, PDFs o videos cortos.</p>
+              </div>
+            </div>
+            <div class="attachment-upload-row">
+              <input id="taskFiles" type="file" multiple />
+            </div>
+            <div class="attachment-list" id="taskAttachmentList"></div>
+          </div>
+
+          <div class="modal-footer">
+            <button class="danger-button hidden" type="button" id="deleteTaskButton">Eliminar</button>
+            <div class="footer-actions-right">
+              <button class="ghost-button" type="button" data-close-modal="task">Cancelar</button>
+              <button class="primary-button" type="submit">Guardar tarea</button>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <div class="modal-backdrop hidden" id="clientModalBackdrop">
+      <div class="modal-card">
+        <div class="modal-header">
+          <div>
+            <p class="eyebrow">Clientes</p>
+            <h3 id="clientModalTitle">Nuevo cliente</h3>
+          </div>
+          <button class="close-button" data-close-modal="client">✕</button>
+        </div>
+        <form class="stack-form" id="clientForm">
+          <input type="hidden" id="clientIdField" />
+          <div class="form-grid two-columns">
+            <label class="field">
+              <span>Nombre</span>
+              <input id="clientNameField" required />
+            </label>
+            <label class="field">
+              <span>Handle</span>
+              <input id="clientHandleField" placeholder="@marca" />
+            </label>
+            <label class="field">
+              <span>Servicio</span>
+              <input id="clientServiceField" />
+            </label>
+            <label class="field">
+              <span>Plan</span>
+              <input id="clientPlanField" />
+            </label>
+            <label class="field">
+              <span>Responsable</span>
+              <select id="clientOwnerField"></select>
+            </label>
+            <label class="field">
+              <span>Estado</span>
+              <select id="clientStatusField">
+                <option>Activo</option>
+                <option>Pausa</option>
+                <option>Interno</option>
+              </select>
+            </label>
+            <label class="field full-row">
+              <span>Canales</span>
+              <input id="clientChannelsField" placeholder="Instagram, Facebook, TikTok" />
+            </label>
+            <label class="field full-row">
+              <span>Notas</span>
+              <textarea id="clientNotesField" rows="4"></textarea>
+            </label>
+          </div>
+          <div class="modal-footer">
+            <button class="danger-button hidden" type="button" id="deleteClientButton">Eliminar</button>
+            <div class="footer-actions-right">
+              <button class="ghost-button" type="button" data-close-modal="client">Cancelar</button>
+              <button class="primary-button" type="submit">Guardar cliente</button>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <div class="modal-backdrop hidden" id="userModalBackdrop">
+      <div class="modal-card">
+        <div class="modal-header">
+          <div>
+            <p class="eyebrow">Admin</p>
+            <h3 id="userModalTitle">Nuevo usuario</h3>
+          </div>
+          <button class="close-button" data-close-modal="user">✕</button>
+        </div>
+        <form class="stack-form" id="userForm">
+          <input type="hidden" id="userIdField" />
+          <div class="form-grid two-columns">
+            <label class="field">
+              <span>Nombre</span>
+              <input id="userNameField" required />
+            </label>
+            <label class="field">
+              <span>Correo</span>
+              <input id="userEmailField" type="email" required />
+            </label>
+            <label class="field">
+              <span>Rol</span>
+              <select id="userRoleField">
+                <option>Admin</option>
+                <option>Project Manager</option>
+                <option>Content Manager</option>
+                <option>Designer</option>
+                <option>Developer</option>
+                <option>Video Editor</option>
+                <option>Colaborador</option>
+              </select>
+            </label>
+            <label class="field">
+              <span>Estado</span>
+              <select id="userStatusField">
+                <option value="active">Activo</option>
+                <option value="invited">Invitado</option>
+                <option value="suspended">Suspendido</option>
+              </select>
+            </label>
+            <label class="field">
+              <span>Accent</span>
+              <select id="userAccentField">
+                <option value="default">Default</option>
+                <option value="admin">Admin</option>
+                <option value="content">Content</option>
+                <option value="design">Design</option>
+                <option value="dev">Dev</option>
+                <option value="video">Video</option>
+              </select>
+            </label>
+            <label class="field">
+              <span>Contraseña</span>
+              <input id="userPasswordField" type="password" placeholder="Déjala vacía para usar invitación" />
+            </label>
+            <label class="field checkbox-field full-row">
+              <span>Enviar invitación por email</span>
+              <input id="userSendInviteField" type="checkbox" checked />
+            </label>
+          </div>
+          <div class="modal-footer">
+            <div class="footer-actions-right">
+              <button class="ghost-button" type="button" data-close-modal="user">Cancelar</button>
+              <button class="primary-button" type="submit">Guardar usuario</button>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <div class="toast-container" id="toastContainer"></div>
+
+    <script src="/app.js"></script>
+  </body>
+</html>
