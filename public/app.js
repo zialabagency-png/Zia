@@ -1,13 +1,10 @@
 const STATUS_CONFIG = [
-  { key: 'brief', label: 'Brief' },
-  { key: 'copy', label: 'Copy' },
-  { key: 'design', label: 'Diseño' },
-  { key: 'doing', label: 'En proceso' },
+  { key: 'not_started', label: 'Sin iniciar' },
+  { key: 'in_progress', label: 'En proceso' },
   { key: 'review', label: 'Revisión' },
-  { key: 'client', label: 'Cliente' },
+  { key: 'sent', label: 'Enviado' },
   { key: 'approved', label: 'Aprobado' },
-  { key: 'scheduled', label: 'Programado' },
-  { key: 'published', label: 'Publicado' }
+  { key: 'scheduled', label: 'Programado' }
 ];
 
 const state = {
@@ -148,6 +145,33 @@ function statusLabel(key) {
   return STATUS_CONFIG.find((item) => item.key === key)?.label || key;
 }
 
+function statusClass(key) {
+  return `status-${key}`;
+}
+
+function uniqueIds(values = []) {
+  return [...new Set((Array.isArray(values) ? values : []).map((item) => String(item || '').trim()).filter(Boolean))];
+}
+
+function getTaskAssigneeIds(task) {
+  const direct = uniqueIds(task?.assigneeIds || []);
+  if (direct.length) return direct;
+  return uniqueIds([task?.assigneeId]);
+}
+
+function getTaskSubtasks(task) {
+  return Array.isArray(task?.subtasks) ? task.subtasks : [];
+}
+
+function isTaskCompleted(task) {
+  return task?.status === 'scheduled';
+}
+
+function getTaskDueReference(task) {
+  const dates = [task?.dueDate, ...getTaskSubtasks(task).map((item) => item.dueDate)].filter(Boolean).sort();
+  return dates[0] || '';
+}
+
 function priorityClass(priority) {
   const lower = String(priority || '').toLowerCase();
   if (lower.startsWith('alta')) return 'high';
@@ -157,6 +181,137 @@ function priorityClass(priority) {
 
 function getUserName(userId) {
   return state.users.find((user) => user.id === userId)?.name || 'Sin asignar';
+}
+
+function getUserNames(ids = []) {
+  const names = uniqueIds(ids).map((id) => getUserName(id)).filter(Boolean);
+  return names.length ? names.join(', ') : 'Sin asignar';
+}
+
+function getTaskAssigneeNames(task) {
+  return getUserNames(getTaskAssigneeIds(task));
+}
+
+function taskMatchesAssignee(task, userId) {
+  return getTaskAssigneeIds(task).includes(userId) || getTaskSubtasks(task).some((subtask) => subtask.assigneeId === userId);
+}
+
+function getSubtaskSummary(task) {
+  const subtasks = getTaskSubtasks(task);
+  const completed = subtasks.filter((item) => item.status === 'scheduled').length;
+  return { total: subtasks.length, completed };
+}
+
+function renderStatusOptions(selected = '') {
+  return STATUS_CONFIG.map((status) => `<option value="${status.key}" ${status.key === selected ? 'selected' : ''}>${escapeHtml(status.label)}</option>`).join('');
+}
+
+function renderAssigneeCheckboxes(selectedIds = []) {
+  return state.users.map((user) => {
+    const checked = selectedIds.includes(user.id) ? 'checked' : '';
+    return `<label class="assignee-check-item"><input type="checkbox" value="${user.id}" ${checked} /><span>${escapeHtml(user.name)}</span><small>${escapeHtml(user.role)}</small></label>`;
+  }).join('');
+}
+
+function getSelectedTaskAssignees() {
+  return [...document.querySelectorAll('#taskAssigneesBox input[type="checkbox"]:checked')].map((input) => input.value);
+}
+
+function buildSubtaskRow(subtask = {}) {
+  return `
+    <div class="subtask-editor-row" data-subtask-row>
+      <input type="hidden" data-subtask-id value="${escapeHtml(subtask.id || '')}" />
+      <label class="field">
+        <span>Subtarea</span>
+        <input data-subtask-title value="${escapeHtml(subtask.title || '')}" placeholder="Ej: Copies del calendario" />
+      </label>
+      <label class="field">
+        <span>Responsable</span>
+        <select data-subtask-assignee>
+          <option value="">Sin asignar</option>
+          ${state.users.map((user) => `<option value="${user.id}" ${subtask.assigneeId === user.id ? 'selected' : ''}>${escapeHtml(user.name)}</option>`).join('')}
+        </select>
+      </label>
+      <label class="field">
+        <span>Entrega</span>
+        <input data-subtask-due type="date" value="${escapeHtml(subtask.dueDate || '')}" />
+      </label>
+      <label class="field">
+        <span>Estado</span>
+        <select data-subtask-status>
+          ${renderStatusOptions(subtask.status || 'not_started')}
+        </select>
+      </label>
+      <label class="field full-row">
+        <span>Entregable / nota</span>
+        <input data-subtask-deliverable value="${escapeHtml(subtask.deliverable || '')}" placeholder="Ej: Artes finales o documento de copies" />
+      </label>
+      <div class="subtask-row-actions">
+        <button class="ghost-button small-button" type="button" data-remove-subtask>Quitar</button>
+      </div>
+    </div>
+  `;
+}
+
+function renderTaskSubtasksEditor(task = null) {
+  const container = document.getElementById('taskSubtasksList');
+  const subtasks = getTaskSubtasks(task);
+  container.innerHTML = subtasks.length ? subtasks.map((subtask) => buildSubtaskRow(subtask)).join('') : '<div class="empty-state compact-empty">Agrega subtareas para copies, diseño, revisión o entregables internos.</div>';
+  bindSubtaskEditorActions();
+}
+
+function addSubtaskRow(subtask = {}) {
+  const container = document.getElementById('taskSubtasksList');
+  if (container.querySelector('.compact-empty')) container.innerHTML = '';
+  container.insertAdjacentHTML('beforeend', buildSubtaskRow(subtask));
+  bindSubtaskEditorActions();
+}
+
+function bindSubtaskEditorActions() {
+  document.querySelectorAll('[data-remove-subtask]').forEach((button) => {
+    button.onclick = () => {
+      const row = button.closest('[data-subtask-row]');
+      row?.remove();
+      const container = document.getElementById('taskSubtasksList');
+      if (container && !container.querySelector('[data-subtask-row]')) {
+        container.innerHTML = '<div class="empty-state compact-empty">Agrega subtareas para copies, diseño, revisión o entregables internos.</div>';
+      }
+    };
+  });
+}
+
+function collectSubtasksFromForm(originalSubtasks = []) {
+  return [...document.querySelectorAll('[data-subtask-row]')].map((row) => {
+    const title = row.querySelector('[data-subtask-title]').value.trim();
+    if (!title) return null;
+    const existing = originalSubtasks.find((item) => item.id === row.querySelector('[data-subtask-id]').value);
+    return {
+      id: existing?.id || row.querySelector('[data-subtask-id]').value || `st_${Math.random().toString(16).slice(2, 10)}`,
+      title,
+      assigneeId: row.querySelector('[data-subtask-assignee]').value,
+      dueDate: row.querySelector('[data-subtask-due]').value,
+      status: row.querySelector('[data-subtask-status]').value,
+      deliverable: row.querySelector('[data-subtask-deliverable]').value.trim(),
+      createdAt: existing?.createdAt,
+      updatedAt: new Date().toISOString()
+    };
+  }).filter(Boolean);
+}
+
+function renderSubtaskPreview(task) {
+  const subtasks = getTaskSubtasks(task);
+  if (!subtasks.length) return '';
+  return `
+    <div class="subtask-preview-list">
+      ${subtasks.slice(0, 3).map((subtask) => `
+        <div class="subtask-preview-item ${statusClass(subtask.status)}">
+          <strong>${escapeHtml(subtask.title)}</strong>
+          <span>${escapeHtml(getUserName(subtask.assigneeId))} · ${escapeHtml(formatDate(subtask.dueDate))}</span>
+        </div>
+      `).join('')}
+      ${subtasks.length > 3 ? `<div class="small-text">+${subtasks.length - 3} subtareas más</div>` : ''}
+    </div>
+  `;
 }
 
 function getClientName(clientId) {
@@ -177,9 +332,16 @@ function parseLinesToChecklist(text, originalChecklist = []) {
 function getFilteredTasks() {
   return state.tasks.filter((task) => {
     if (state.filters.clientId !== 'all' && task.clientId !== state.filters.clientId) return false;
-    if (state.filters.assigneeId !== 'all' && task.assigneeId !== state.filters.assigneeId) return false;
+    if (state.filters.assigneeId !== 'all' && !taskMatchesAssignee(task, state.filters.assigneeId)) return false;
     if (state.filters.priority !== 'all' && task.priority !== state.filters.priority) return false;
-    const haystack = `${task.title} ${task.description} ${getClientName(task.clientId)} ${getUserName(task.assigneeId)}`.toLowerCase();
+    const haystack = [
+      task.title,
+      task.description,
+      getClientName(task.clientId),
+      getTaskAssigneeNames(task),
+      ...(task.labels || []),
+      ...getTaskSubtasks(task).flatMap((subtask) => [subtask.title, subtask.deliverable, getUserName(subtask.assigneeId)])
+    ].join(' ').toLowerCase();
     if (state.filters.search && !haystack.includes(state.filters.search.toLowerCase())) return false;
     return true;
   });
@@ -195,7 +357,7 @@ function seedSelectOptions() {
   els.assigneeFilter.value = state.filters.assigneeId;
 
   document.getElementById('taskClient').innerHTML = state.clients.map((client) => `<option value="${client.id}">${escapeHtml(client.name)}</option>`).join('');
-  document.getElementById('taskAssignee').innerHTML = [`<option value="">Sin asignar</option>`, ...state.users.map((user) => `<option value="${user.id}">${escapeHtml(user.name)}</option>`)].join('');
+  document.getElementById('taskAssigneesBox').innerHTML = renderAssigneeCheckboxes([]);
   document.getElementById('clientOwnerField').innerHTML = [`<option value="">Sin responsable</option>`, ...state.users.map((user) => `<option value="${user.id}">${escapeHtml(user.name)}</option>`)].join('');
   document.getElementById('taskStatus').innerHTML = STATUS_CONFIG.map((status) => `<option value="${status.key}">${escapeHtml(status.label)}</option>`).join('');
 }
@@ -220,14 +382,14 @@ function updateTopbar() {
 
 function renderSidebarQuickStats() {
   const totalTasks = state.tasks.length;
-  const overdueTasks = state.tasks.filter((task) => task.dueDate && task.dueDate < isoDate(new Date()) && task.status !== 'published').length;
+  const overdueTasks = state.tasks.filter((task) => task.dueDate && task.dueDate < isoDate(new Date()) && !isTaskCompleted(task)).length;
   const approved = state.tasks.filter((task) => task.status === 'approved').length;
-  const published = state.tasks.filter((task) => task.status === 'published').length;
+  const scheduled = state.tasks.filter((task) => task.status === 'scheduled').length;
   els.sidebarQuickStats.innerHTML = `
     <li>${totalTasks} tareas activas</li>
     <li>${state.clients.length} clientes en operación</li>
     <li>${overdueTasks} tareas vencidas</li>
-    <li>${approved} aprobadas · ${published} publicadas</li>
+    <li>${approved} aprobadas · ${scheduled} programadas</li>
   `;
 }
 
@@ -248,13 +410,17 @@ function render() {
 
 function renderDashboard() {
   const filtered = getFilteredTasks();
-  const dueSoon = filtered.filter((task) => task.dueDate).sort((a, b) => a.dueDate.localeCompare(b.dueDate)).slice(0, 6);
+  const dueSoon = filtered
+    .filter((task) => getTaskDueReference(task))
+    .sort((a, b) => getTaskDueReference(a).localeCompare(getTaskDueReference(b)))
+    .slice(0, 6);
   const workload = state.users.map((user) => ({
     user,
-    total: filtered.filter((task) => task.assigneeId === user.id && task.status !== 'published').length
+    total: filtered.filter((task) => taskMatchesAssignee(task, user.id) && !isTaskCompleted(task)).length
   })).sort((a, b) => b.total - a.total);
   const byStatus = STATUS_CONFIG.map((status) => ({
     label: status.label,
+    key: status.key,
     count: filtered.filter((task) => task.status === status.key).length
   }));
   const tasksWithAttachments = filtered.filter((task) => (task.attachments || []).length).length;
@@ -292,11 +458,11 @@ function renderDashboard() {
               <div class="client-card-header">
                 <div>
                   <strong>${escapeHtml(task.title)}</strong>
-                  <div class="small-text">${escapeHtml(getClientName(task.clientId))} · ${escapeHtml(getUserName(task.assigneeId))}</div>
+                  <div class="small-text">${escapeHtml(getClientName(task.clientId))} · ${escapeHtml(getTaskAssigneeNames(task))}</div>
                 </div>
                 <span class="badge ${priorityClass(task.priority)}">${escapeHtml(task.priority)}</span>
               </div>
-              <div class="small-text">Entrega ${escapeHtml(formatDate(task.dueDate))} · Estado ${escapeHtml(statusLabel(task.status))}</div>
+              <div class="small-text">Entrega ${escapeHtml(formatDate(getTaskDueReference(task)))} · Estado <span class="badge stage-badge ${statusClass(task.status)}">${escapeHtml(statusLabel(task.status))}</span></div>
             </div>
           `).join('') : `<div class="empty-state">No hay entregas con esos filtros.</div>`}
         </div>
@@ -333,7 +499,7 @@ function renderDashboard() {
             <div class="user-row">
               <div class="client-card-header">
                 <strong>${escapeHtml(status.label)}</strong>
-                <span class="badge">${status.count}</span>
+                <span class="badge stage-badge ${statusClass(status.key)}">${status.count}</span>
               </div>
               <div class="progress-bar"><span style="width:${Math.min(status.count * 14, 100)}%"></span></div>
             </div>
@@ -349,7 +515,7 @@ function renderDashboard() {
         </div>
         <div class="stack-form">
           ${state.clients.map((client) => {
-            const total = filtered.filter((task) => task.clientId === client.id && task.status !== 'published').length;
+            const total = filtered.filter((task) => task.clientId === client.id && !isTaskCompleted(task)).length;
             return `
               <div class="user-row">
                 <div class="client-card-header">
@@ -374,13 +540,13 @@ function renderTasks() {
 function renderTaskBoardHtml(tasks) {
   return `
     <section class="panel">
-      <div class="board-grid">
+      <div class="board-grid six-columns">
         ${STATUS_CONFIG.map((status) => {
           const columnTasks = tasks.filter((task) => task.status === status.key);
           return `
-            <section class="board-column" data-column-status="${status.key}">
+            <section class="board-column ${statusClass(status.key)}" data-column-status="${status.key}">
               <div class="column-header">
-                <div class="column-title"><span class="dot"></span><strong>${escapeHtml(status.label)}</strong></div>
+                <div class="column-title"><span class="dot ${statusClass(status.key)}"></span><strong>${escapeHtml(status.label)}</strong></div>
                 <span class="count-pill">${columnTasks.length}</span>
               </div>
               ${columnTasks.length ? columnTasks.map(renderTaskCard).join('') : `<div class="empty-state">Sin tareas</div>`}
@@ -395,8 +561,9 @@ function renderTaskBoardHtml(tasks) {
 function renderTaskCard(task) {
   const checklistDone = (task.checklist || []).filter((item) => item.done).length;
   const checklistTotal = (task.checklist || []).length;
+  const subtaskSummary = getSubtaskSummary(task);
   return `
-    <article class="task-card" draggable="true" data-task-id="${task.id}">
+    <article class="task-card ${statusClass(task.status)}" draggable="true" data-task-id="${task.id}">
       <div class="task-card-header">
         <div>
           <h4 class="task-title">${escapeHtml(task.title)}</h4>
@@ -404,20 +571,31 @@ function renderTaskCard(task) {
         </div>
         <span class="badge ${priorityClass(task.priority)}">${escapeHtml(task.priority)}</span>
       </div>
+      <div class="task-meta-top">
+        <span class="badge stage-badge ${statusClass(task.status)}">${escapeHtml(statusLabel(task.status))}</span>
+        <div class="small-text">Responsables: ${escapeHtml(getTaskAssigneeNames(task))}</div>
+      </div>
       <p class="task-description">${escapeHtml(task.description || 'Sin descripción')}</p>
       <div class="task-meta-row">
         <div class="small-text">${escapeHtml(task.type)} · ${escapeHtml(task.channel)}</div>
-        <div class="small-text">${escapeHtml(getUserName(task.assigneeId))}</div>
+        <div class="small-text">Entrega ${escapeHtml(formatDate(getTaskDueReference(task) || task.dueDate))}</div>
       </div>
       <div class="tags-row">
-        <span class="task-chip">Entrega ${escapeHtml(formatDate(task.dueDate))}</span>
         ${task.publishDate ? `<span class="task-chip">Publica ${escapeHtml(formatDate(task.publishDate))}</span>` : ''}
         ${task.approvalRequired ? '<span class="task-chip">Aprobación</span>' : ''}
         ${checklistTotal ? `<span class="task-chip">Checklist ${checklistDone}/${checklistTotal}</span>` : ''}
+        ${subtaskSummary.total ? `<span class="task-chip">Subtareas ${subtaskSummary.completed}/${subtaskSummary.total}</span>` : ''}
         ${(task.attachments || []).length ? `<span class="task-chip">Adjuntos ${(task.attachments || []).length}</span>` : ''}
       </div>
+      ${renderSubtaskPreview(task)}
       ${(task.labels || []).length ? `<div class="tags-row">${task.labels.map((label) => `<span class="badge">#${escapeHtml(label)}</span>`).join('')}</div>` : ''}
-      <div class="table-actions">
+      <div class="task-card-footer">
+        <label class="inline-status-wrap">
+          <span class="small-text">Estado</span>
+          <select class="inline-status-select ${statusClass(task.status)}" data-task-status-select="${task.id}">
+            ${renderStatusOptions(task.status)}
+          </select>
+        </label>
         <button class="text-button" data-edit-task="${task.id}">Editar</button>
       </div>
     </article>
@@ -432,7 +610,8 @@ function renderTaskTableHtml(tasks) {
           <tr>
             <th>Tarea</th>
             <th>Cliente</th>
-            <th>Responsable</th>
+            <th>Responsables</th>
+            <th>Subtareas</th>
             <th>Estado</th>
             <th>Entrega</th>
             <th>Adjuntos</th>
@@ -440,25 +619,27 @@ function renderTaskTableHtml(tasks) {
           </tr>
         </thead>
         <tbody>
-          ${tasks.length ? tasks.map((task) => `
+          ${tasks.length ? tasks.map((task) => {
+            const subtaskSummary = getSubtaskSummary(task);
+            return `
             <tr>
               <td data-label="Tarea">
                 <strong>${escapeHtml(task.title)}</strong>
                 <div class="table-subtext">${escapeHtml(task.type)} · ${escapeHtml(task.channel)} · ${escapeHtml(task.priority)}</div>
               </td>
               <td data-label="Cliente">${escapeHtml(getClientName(task.clientId))}</td>
-              <td data-label="Responsable">${escapeHtml(getUserName(task.assigneeId))}</td>
-              <td data-label="Estado"><span class="badge">${escapeHtml(statusLabel(task.status))}</span></td>
-              <td data-label="Entrega">${escapeHtml(formatDate(task.dueDate))}</td>
+              <td data-label="Responsables">${escapeHtml(getTaskAssigneeNames(task))}</td>
+              <td data-label="Subtareas">${subtaskSummary.total ? `${subtaskSummary.completed}/${subtaskSummary.total}` : '—'}</td>
+              <td data-label="Estado"><select class="inline-status-select ${statusClass(task.status)}" data-task-status-select="${task.id}">${renderStatusOptions(task.status)}</select></td>
+              <td data-label="Entrega">${escapeHtml(formatDate(getTaskDueReference(task) || task.dueDate))}</td>
               <td data-label="Adjuntos">${(task.attachments || []).length}</td>
               <td data-label="Acciones">
                 <div class="table-actions">
                   <button class="text-button" data-edit-task="${task.id}">Editar</button>
-                  <button class="text-button" data-quick-status="${task.id}">Siguiente etapa</button>
                 </div>
               </td>
             </tr>
-          `).join('') : `<tr><td colspan="7"><div class="empty-state">No hay tareas con esos filtros.</div></td></tr>`}
+          `}).join('') : `<tr><td colspan="8"><div class="empty-state">No hay tareas con esos filtros.</div></td></tr>`}
         </tbody>
       </table>
     </section>
@@ -775,9 +956,9 @@ function openTaskModal(taskId = '') {
   document.getElementById('taskType').value = task?.type || '';
   document.getElementById('taskChannel').value = task?.channel || '';
   document.getElementById('taskFormat').value = task?.format || '';
-  document.getElementById('taskAssignee').value = task?.assigneeId || '';
+  document.getElementById('taskAssigneesBox').innerHTML = renderAssigneeCheckboxes(getTaskAssigneeIds(task || {}));
   document.getElementById('taskPriority').value = task?.priority || 'Media';
-  document.getElementById('taskStatus').value = task?.status || 'brief';
+  document.getElementById('taskStatus').value = task?.status || 'not_started';
   document.getElementById('taskDueDate').value = task?.dueDate || '';
   document.getElementById('taskPublishDate').value = task?.publishDate || '';
   document.getElementById('taskApproval').checked = Boolean(task?.approvalRequired);
@@ -785,6 +966,7 @@ function openTaskModal(taskId = '') {
   document.getElementById('taskChecklist').value = (task?.checklist || []).map((item) => item.text).join('\n');
   document.getElementById('taskComment').value = '';
   document.getElementById('taskFiles').value = '';
+  renderTaskSubtasksEditor(task || null);
   renderTaskAttachments(task);
   els.taskModalBackdrop.classList.remove('hidden');
 }
@@ -860,7 +1042,7 @@ async function saveTaskFromForm() {
     type: document.getElementById('taskType').value.trim() || 'General',
     channel: document.getElementById('taskChannel').value.trim() || 'General',
     format: document.getElementById('taskFormat').value.trim(),
-    assigneeId: document.getElementById('taskAssignee').value,
+    assigneeIds: getSelectedTaskAssignees(),
     priority: document.getElementById('taskPriority').value,
     status: document.getElementById('taskStatus').value,
     dueDate: document.getElementById('taskDueDate').value,
@@ -868,6 +1050,7 @@ async function saveTaskFromForm() {
     approvalRequired: document.getElementById('taskApproval').checked,
     labels: document.getElementById('taskLabels').value.split(',').map((item) => item.trim()).filter(Boolean),
     checklist: parseLinesToChecklist(document.getElementById('taskChecklist').value, original?.checklist || []),
+    subtasks: collectSubtasksFromForm(original?.subtasks || []),
     comments: [
       ...(original?.comments || []),
       ...(() => {
@@ -1004,17 +1187,15 @@ function bindDynamicActions() {
   document.querySelectorAll('[data-edit-task]').forEach((button) => {
     button.addEventListener('click', () => openTaskModal(button.dataset.editTask));
   });
-  document.querySelectorAll('[data-quick-status]').forEach((button) => {
-    button.addEventListener('click', async () => {
-      const task = state.tasks.find((item) => item.id === button.dataset.quickStatus);
-      if (!task) return;
-      const currentIndex = STATUS_CONFIG.findIndex((item) => item.key === task.status);
-      const nextStatus = STATUS_CONFIG[Math.min(currentIndex + 1, STATUS_CONFIG.length - 1)].key;
+  document.querySelectorAll('[data-task-status-select]').forEach((select) => {
+    select.addEventListener('change', async () => {
+      const task = state.tasks.find((item) => item.id === select.dataset.taskStatusSelect);
+      if (!task || task.status === select.value) return;
       try {
         const updated = await api(`/api/tasks/${task.id}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ ...task, status: nextStatus })
+          body: JSON.stringify({ ...task, status: select.value })
         });
         state.tasks = state.tasks.map((item) => item.id === updated.id ? updated : item);
         render();
@@ -1085,9 +1266,9 @@ function bindDynamicActions() {
   if (runRemindersButton) {
     runRemindersButton.addEventListener('click', async () => {
       try {
-        const result = await api('/api/admin/reminders/run', { method: 'POST' });
+        const result = await api('/api/admin/run-reminders', { method: 'POST' });
+        showToast('Recordatorios ejecutados', `Enviados: ${result.sent || 0} · Saltados: ${result.skipped || 0}`);
         await refreshBootstrap();
-        showToast('Recordatorios ejecutados', `Enviados: ${result.sent || 0} · Omitidos: ${result.skipped || 0}`);
       } catch (error) {
         showToast('Error', error.message, 'error');
       }
@@ -1097,13 +1278,9 @@ function bindDynamicActions() {
     button.addEventListener('click', async () => {
       try {
         await api(`/api/attachments/${button.dataset.deleteAttachment}`, { method: 'DELETE' });
-        const currentTaskId = document.getElementById('taskId').value;
-        const task = state.tasks.find((item) => item.id === currentTaskId);
-        if (task) {
-          task.attachments = (task.attachments || []).filter((item) => item.id !== button.dataset.deleteAttachment);
-          renderTaskAttachments(task);
-        }
-        showToast('Adjunto eliminado', 'El archivo fue removido.');
+        await refreshBootstrap();
+        const taskId = document.getElementById('taskId').value;
+        if (taskId) openTaskModal(taskId);
       } catch (error) {
         showToast('Error', error.message, 'error');
       }
@@ -1255,6 +1432,7 @@ function bindStaticEvents() {
   });
 
   els.newTaskButton.addEventListener('click', () => openTaskModal());
+  document.getElementById('addSubtaskButton').addEventListener('click', () => addSubtaskRow());
   els.newClientButton.addEventListener('click', () => openClientModal());
   els.newUserButton.addEventListener('click', () => openUserModal());
   els.logoutButton.addEventListener('click', async () => {

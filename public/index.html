@@ -186,10 +186,10 @@
               <span>Formato</span>
               <input id="taskFormat" placeholder="1080x1350, Vertical 9:16..." />
             </label>
-            <label class="field">
-              <span>Responsable</span>
-              <select id="taskAssignee"></select>
-            </label>
+            <div class="field full-row">
+              <span>Responsables</span>
+              <div id="taskAssigneesBox" class="assignee-check-grid"></div>
+            </div>
             <label class="field">
               <span>Prioridad</span>
               <select id="taskPriority">
@@ -226,6 +226,17 @@
               <span>Comentario nuevo</span>
               <textarea id="taskComment" rows="3" placeholder="Nota interna adicional"></textarea>
             </label>
+          </div>
+
+          <div class="panel inner-panel">
+            <div class="panel-header compact-head">
+              <div>
+                <h4 class="panel-title no-margin">Subtareas</h4>
+                <p class="small-text">Organiza entregables internos para diseño, content o revisión.</p>
+              </div>
+              <button class="secondary-button" type="button" id="addSubtaskButton">Agregar subtarea</button>
+            </div>
+            <div class="subtask-editor-list" id="taskSubtasksList"></div>
           </div>
 
           <div class="panel inner-panel">
