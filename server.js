@@ -15,7 +15,7 @@ const DB_FILE = path.join(DATA_DIR, 'db.json');
 const UPLOADS_DIR = path.join(DATA_DIR, 'uploads');
 const SESSION_COOKIE = 'zia_session';
 const SESSION_DAYS = 30;
-const STATUS_ORDER = ['brief', 'copy', 'design', 'doing', 'review', 'client', 'approved', 'scheduled', 'published'];
+const STATUS_ORDER = ['not_started', 'in_progress', 'review', 'sent', 'approved', 'scheduled'];
 const TOKEN_TYPES = { INVITE: 'invite', RESET: 'reset' };
 const APP_BASE_URL = process.env.APP_BASE_URL || `http://localhost:${PORT}`;
 
@@ -116,9 +116,68 @@ function normalizeArray(value) {
   return Array.isArray(value) ? value : [];
 }
 
+function uniqStrings(values = []) {
+  return [...new Set(normalizeArray(values).map((item) => String(item || '').trim()).filter(Boolean))];
+}
+
+function mapLegacyStatus(status) {
+  const value = String(status || '').trim().toLowerCase();
+  if (STATUS_ORDER.includes(value)) return value;
+  const legacyMap = {
+    brief: 'not_started',
+    copy: 'in_progress',
+    design: 'in_progress',
+    doing: 'in_progress',
+    review: 'review',
+    client: 'sent',
+    approved: 'approved',
+    scheduled: 'scheduled',
+    published: 'scheduled',
+    'sin iniciar': 'not_started',
+    'en proceso': 'in_progress',
+    revisión: 'review',
+    revision: 'review',
+    enviado: 'sent',
+    aprobado: 'approved',
+    programado: 'scheduled'
+  };
+  return legacyMap[value] || 'not_started';
+}
+
+function statusText(value) {
+  return {
+    not_started: 'Sin iniciar',
+    in_progress: 'En proceso',
+    review: 'Revisión',
+    sent: 'Enviado',
+    approved: 'Aprobado',
+    scheduled: 'Programado'
+  }[mapLegacyStatus(value)] || 'Sin iniciar';
+}
+
+function normalizeSubtask(subtask = {}) {
+  const now = nowIso();
+  return {
+    id: subtask.id || generateId('st'),
+    title: String(subtask.title || '').trim(),
+    assigneeId: String(subtask.assigneeId || '').trim(),
+    dueDate: normalizeDate(subtask.dueDate),
+    status: mapLegacyStatus(subtask.status),
+    deliverable: String(subtask.deliverable || '').trim(),
+    createdAt: subtask.createdAt || now,
+    updatedAt: subtask.updatedAt || now
+  };
+}
+
+function getTaskAssigneeIds(task = {}) {
+  const direct = uniqStrings(task.assigneeIds);
+  if (direct.length) return direct;
+  return uniqStrings([task.assigneeId]);
+}
+
 function normalizeTask(task) {
   const now = nowIso();
-  const safeStatus = STATUS_ORDER.includes(task.status) ? task.status : 'brief';
+  const assigneeIds = getTaskAssigneeIds(task);
   return {
     id: task.id || generateId('t'),
     title: String(task.title || 'Nueva tarea').trim(),
@@ -127,18 +186,20 @@ function normalizeTask(task) {
     type: String(task.type || 'General').trim(),
     channel: String(task.channel || 'General').trim(),
     format: String(task.format || '').trim(),
-    assigneeId: task.assigneeId || '',
+    assigneeId: assigneeIds[0] || '',
+    assigneeIds,
     priority: task.priority || 'Media',
-    status: safeStatus,
+    status: mapLegacyStatus(task.status),
     dueDate: normalizeDate(task.dueDate),
     publishDate: normalizeDate(task.publishDate),
     approvalRequired: Boolean(task.approvalRequired),
-    labels: normalizeArray(task.labels).map((item) => String(item).trim()).filter(Boolean),
+    labels: uniqStrings(task.labels),
     checklist: normalizeArray(task.checklist).map((item) => ({
       id: item.id || generateId('cl'),
       text: String(item.text || '').trim(),
       done: Boolean(item.done)
     })).filter((item) => item.text),
+    subtasks: normalizeArray(task.subtasks).map(normalizeSubtask).filter((item) => item.title),
     comments: normalizeArray(task.comments).map((item) => ({
       id: item.id || generateId('cm'),
       authorId: item.authorId || '',
@@ -293,10 +354,10 @@ function defaultSeedData() {
       { id: 'c4', name: 'TekkoCode', handle: '@tekkocode', service: 'Branding + captación', plan: 'Interno', status: 'Interno', ownerId: 'u1', channels: ['Instagram', 'LinkedIn', 'Website'], notes: 'Generar leads de desarrollo web y automatizaciones.', createdAt: currentTime, updatedAt: currentTime }
     ],
     tasks: [
-      { id: 't1', title: 'Reel promo Semana Santa', description: 'Crear idea, guion corto y edición para paquete de fin de semana.', clientId: 'c1', type: 'Reel', channel: 'Instagram', format: 'Vertical 9:16', assigneeId: 'u5', priority: 'Alta', status: 'design', dueDate: '2026-04-21', publishDate: '2026-04-22', approvalRequired: true, labels: ['venta', 'video'], checklist: [{ id: 'cl1', text: 'Hook del video', done: true }, { id: 'cl2', text: 'Edición y subtítulos', done: false }, { id: 'cl3', text: 'Portada', done: false }], comments: [{ id: 'cm1', authorId: 'u2', text: 'Usar enfoque más aspiracional y premium.', createdAt: currentTime }], createdById: 'u1', createdAt: currentTime, updatedAt: currentTime },
-      { id: 't2', title: 'Carrusel: 5 señales de bruxismo', description: 'Copy educativo y diseño con CTA a evaluación.', clientId: 'c2', type: 'Carrusel', channel: 'Instagram', format: '1080x1350', assigneeId: 'u3', priority: 'Media', status: 'review', dueDate: '2026-04-20', publishDate: '2026-04-21', approvalRequired: true, labels: ['educativo', 'diseño'], checklist: [{ id: 'cl4', text: 'Copy final', done: true }, { id: 'cl5', text: 'Diseño aprobado interno', done: true }], comments: [{ id: 'cm2', authorId: 'u1', text: 'Buen rumbo. Subir un poco el tamaño del CTA.', createdAt: currentTime }], createdById: 'u1', createdAt: currentTime, updatedAt: currentTime },
-      { id: 't3', title: 'Historias promo de libras', description: 'Set de 4 stories con foco en rapidez y precio por libra.', clientId: 'c3', type: 'Stories', channel: 'Instagram', format: '1080x1920', assigneeId: 'u2', priority: 'Alta', status: 'copy', dueDate: '2026-04-20', publishDate: '2026-04-20', approvalRequired: false, labels: ['stories', 'promo'], checklist: [{ id: 'cl6', text: 'Copy inicial', done: false }, { id: 'cl7', text: 'Idea visual', done: false }], comments: [], createdById: 'u1', createdAt: currentTime, updatedAt: currentTime },
-      { id: 't4', title: 'Landing captación TekkoCode', description: 'Actualizar hero, CTA y casos de uso para agencias y eCommerce.', clientId: 'c4', type: 'Web', channel: 'Website', format: 'Landing', assigneeId: 'u4', priority: 'Alta', status: 'doing', dueDate: '2026-04-25', publishDate: '2026-04-26', approvalRequired: true, labels: ['dev', 'captación'], checklist: [{ id: 'cl8', text: 'Nuevo layout', done: true }, { id: 'cl9', text: 'Formulario conectado', done: false }], comments: [], createdById: 'u1', createdAt: currentTime, updatedAt: currentTime }
+      { id: 't1', title: 'Reel promo Semana Santa', description: 'Crear idea, guion corto y edición para paquete de fin de semana.', clientId: 'c1', type: 'Reel', channel: 'Instagram', format: 'Vertical 9:16', assigneeIds: ['u2', 'u5'], priority: 'Alta', status: 'in_progress', dueDate: '2026-04-21', publishDate: '2026-04-22', approvalRequired: true, labels: ['venta', 'video'], checklist: [{ id: 'cl1', text: 'Hook del video', done: true }, { id: 'cl2', text: 'Edición y subtítulos', done: false }, { id: 'cl3', text: 'Portada', done: false }], subtasks: [{ id: 'st1', title: 'Guion corto', assigneeId: 'u2', dueDate: '2026-04-20', status: 'review', deliverable: 'Copy final' }, { id: 'st2', title: 'Edición vertical', assigneeId: 'u5', dueDate: '2026-04-21', status: 'in_progress', deliverable: 'Video con subtítulos' }], comments: [{ id: 'cm1', authorId: 'u2', text: 'Usar enfoque más aspiracional y premium.', createdAt: currentTime }], createdById: 'u1', createdAt: currentTime, updatedAt: currentTime },
+      { id: 't2', title: 'Calendario mensual Eves Dental', description: 'Definir contenido del mes, copies y artes listos para aprobación.', clientId: 'c2', type: 'Calendario', channel: 'Instagram', format: 'Mensual', assigneeIds: ['u2', 'u3'], priority: 'Alta', status: 'review', dueDate: '2026-04-24', publishDate: '2026-04-25', approvalRequired: true, labels: ['calendario', 'contenido'], checklist: [{ id: 'cl4', text: 'Propuesta de temas', done: true }, { id: 'cl5', text: 'Diseño base del feed', done: false }], subtasks: [{ id: 'st3', title: 'Ideas y copies del mes', assigneeId: 'u2', dueDate: '2026-04-22', status: 'review', deliverable: 'Documento de copies' }, { id: 'st4', title: 'Línea visual del calendario', assigneeId: 'u3', dueDate: '2026-04-23', status: 'in_progress', deliverable: 'Artes en Canva/Figma' }], comments: [{ id: 'cm2', authorId: 'u1', text: 'Mantener tono educativo y comercial balanceado.', createdAt: currentTime }], createdById: 'u1', createdAt: currentTime, updatedAt: currentTime },
+      { id: 't3', title: 'Historias promo de libras', description: 'Set de 4 stories con foco en rapidez y precio por libra.', clientId: 'c3', type: 'Stories', channel: 'Instagram', format: '1080x1920', assigneeIds: ['u2'], priority: 'Alta', status: 'not_started', dueDate: '2026-04-20', publishDate: '2026-04-20', approvalRequired: false, labels: ['stories', 'promo'], checklist: [{ id: 'cl6', text: 'Copy inicial', done: false }, { id: 'cl7', text: 'Idea visual', done: false }], subtasks: [], comments: [], createdById: 'u1', createdAt: currentTime, updatedAt: currentTime },
+      { id: 't4', title: 'Landing captación TekkoCode', description: 'Actualizar hero, CTA y casos de uso para agencias y eCommerce.', clientId: 'c4', type: 'Web', channel: 'Website', format: 'Landing', assigneeIds: ['u4'], priority: 'Alta', status: 'in_progress', dueDate: '2026-04-25', publishDate: '2026-04-26', approvalRequired: true, labels: ['dev', 'captación'], checklist: [{ id: 'cl8', text: 'Nuevo layout', done: true }, { id: 'cl9', text: 'Formulario conectado', done: false }], subtasks: [], comments: [], createdById: 'u1', createdAt: currentTime, updatedAt: currentTime }
     ],
     attachments: [],
     sessions: [],
@@ -389,7 +450,7 @@ function createFileAdapter() {
       const tasks = decorateTasks(db).sort((a, b) => {
         const aIndex = STATUS_ORDER.indexOf(a.status);
         const bIndex = STATUS_ORDER.indexOf(b.status);
-        if (aIndex !== bIndex) return aIndex - bIndex;
+        if (aIndex !== bIndex) return (aIndex === -1 ? 99 : aIndex) - (bIndex === -1 ? 99 : bIndex);
         return new Date(b.updatedAt || 0) - new Date(a.updatedAt || 0);
       });
       return {
@@ -643,7 +704,7 @@ function createPostgresAdapter() {
     }).sort((a, b) => {
       const aIndex = STATUS_ORDER.indexOf(a.status);
       const bIndex = STATUS_ORDER.indexOf(b.status);
-      if (aIndex !== bIndex) return aIndex - bIndex;
+      if (aIndex !== bIndex) return (aIndex === -1 ? 99 : aIndex) - (bIndex === -1 ? 99 : bIndex);
       return new Date(b.updatedAt || 0) - new Date(a.updatedAt || 0);
     });
   }
@@ -668,9 +729,9 @@ function createPostgresAdapter() {
     }
     for (const task of seed.tasks.map(normalizeTask)) {
       await query(
-        `INSERT INTO tasks (id, title, description, client_id, type, channel, format, assignee_id, priority, status, due_date, publish_date, approval_required, labels, checklist, comments, created_by_id, created_at, updated_at)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14::jsonb,$15::jsonb,$16::jsonb,$17,$18,$19)`,
-        [task.id, task.title, task.description, task.clientId || null, task.type, task.channel, task.format, task.assigneeId || null, task.priority, task.status, task.dueDate || null, task.publishDate || null, task.approvalRequired, JSON.stringify(task.labels), JSON.stringify(task.checklist), JSON.stringify(task.comments), task.createdById || null, task.createdAt, task.updatedAt]
+        `INSERT INTO tasks (id, title, description, client_id, type, channel, format, assignee_id, assignee_ids, priority, status, due_date, publish_date, approval_required, labels, checklist, subtasks, comments, created_by_id, created_at, updated_at)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,$10,$11,$12,$13,$14,$15::jsonb,$16::jsonb,$17::jsonb,$18::jsonb,$19,$20,$21)`,
+        [task.id, task.title, task.description, task.clientId || null, task.type, task.channel, task.format, task.assigneeId || null, JSON.stringify(task.assigneeIds || []), task.priority, task.status, task.dueDate || null, task.publishDate || null, task.approvalRequired, JSON.stringify(task.labels), JSON.stringify(task.checklist), JSON.stringify(task.subtasks || []), JSON.stringify(task.comments), task.createdById || null, task.createdAt, task.updatedAt]
       );
     }
   }
@@ -716,6 +777,7 @@ function createPostgresAdapter() {
       channel: row.channel,
       format: row.format,
       assigneeId: row.assignee_id || '',
+      assigneeIds: row.assignee_ids || [],
       priority: row.priority,
       status: row.status,
       dueDate: row.due_date,
@@ -723,6 +785,7 @@ function createPostgresAdapter() {
       approvalRequired: row.approval_required,
       labels: row.labels || [],
       checklist: row.checklist || [],
+      subtasks: row.subtasks || [],
       comments: row.comments || [],
       createdById: row.created_by_id || '',
       createdAt: row.created_at,
@@ -788,6 +851,7 @@ function createPostgresAdapter() {
           channel TEXT NOT NULL,
           format TEXT,
           assignee_id TEXT REFERENCES users(id) ON DELETE SET NULL,
+          assignee_ids JSONB NOT NULL DEFAULT '[]'::jsonb,
           priority TEXT NOT NULL,
           status TEXT NOT NULL,
           due_date DATE,
@@ -795,6 +859,7 @@ function createPostgresAdapter() {
           approval_required BOOLEAN NOT NULL DEFAULT FALSE,
           labels JSONB NOT NULL DEFAULT '[]'::jsonb,
           checklist JSONB NOT NULL DEFAULT '[]'::jsonb,
+          subtasks JSONB NOT NULL DEFAULT '[]'::jsonb,
           comments JSONB NOT NULL DEFAULT '[]'::jsonb,
           created_by_id TEXT REFERENCES users(id) ON DELETE SET NULL,
           created_at TIMESTAMPTZ NOT NULL,
@@ -847,6 +912,9 @@ function createPostgresAdapter() {
           created_at TIMESTAMPTZ NOT NULL
         );
       `);
+      await query(`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS assignee_ids JSONB NOT NULL DEFAULT '[]'::jsonb`);
+      await query(`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS subtasks JSONB NOT NULL DEFAULT '[]'::jsonb`);
+      await query(`UPDATE tasks SET assignee_ids = CASE WHEN assignee_id IS NULL OR assignee_id = '' THEN '[]'::jsonb ELSE jsonb_build_array(assignee_id) END WHERE assignee_ids IS NULL OR assignee_ids = '[]'::jsonb`);
       await seedIfNeeded();
       await query('DELETE FROM sessions WHERE expires_at <= NOW()');
       await query('DELETE FROM email_tokens WHERE used_at IS NOT NULL OR expires_at <= NOW()');
@@ -965,17 +1033,17 @@ function createPostgresAdapter() {
         if (!currentRes.rows[0]) return null;
         const merged = normalizeTask({ ...mapTaskRow(currentRes.rows[0]), ...payload, id: payload.id, updatedAt: nowIso() });
         await query(
-          `UPDATE tasks SET title=$2, description=$3, client_id=$4, type=$5, channel=$6, format=$7, assignee_id=$8, priority=$9, status=$10, due_date=$11, publish_date=$12, approval_required=$13, labels=$14::jsonb, checklist=$15::jsonb, comments=$16::jsonb, created_by_id=$17, updated_at=$18 WHERE id=$1`,
-          [merged.id, merged.title, merged.description, merged.clientId || null, merged.type, merged.channel, merged.format, merged.assigneeId || null, merged.priority, merged.status, merged.dueDate || null, merged.publishDate || null, merged.approvalRequired, JSON.stringify(merged.labels), JSON.stringify(merged.checklist), JSON.stringify(merged.comments), merged.createdById || null, merged.updatedAt]
+          `UPDATE tasks SET title=$2, description=$3, client_id=$4, type=$5, channel=$6, format=$7, assignee_id=$8, assignee_ids=$9::jsonb, priority=$10, status=$11, due_date=$12, publish_date=$13, approval_required=$14, labels=$15::jsonb, checklist=$16::jsonb, subtasks=$17::jsonb, comments=$18::jsonb, created_by_id=$19, updated_at=$20 WHERE id=$1`,
+          [merged.id, merged.title, merged.description, merged.clientId || null, merged.type, merged.channel, merged.format, merged.assigneeId || null, JSON.stringify(merged.assigneeIds || []), merged.priority, merged.status, merged.dueDate || null, merged.publishDate || null, merged.approvalRequired, JSON.stringify(merged.labels), JSON.stringify(merged.checklist), JSON.stringify(merged.subtasks || []), JSON.stringify(merged.comments), merged.createdById || null, merged.updatedAt]
         );
         const attachmentsRes = await query('SELECT * FROM attachments WHERE task_id=$1 ORDER BY created_at DESC', [merged.id]);
         return { ...merged, attachments: attachmentsRes.rows.map(mapAttachmentRow) };
       }
       const task = normalizeTask(payload);
       await query(
-        `INSERT INTO tasks (id, title, description, client_id, type, channel, format, assignee_id, priority, status, due_date, publish_date, approval_required, labels, checklist, comments, created_by_id, created_at, updated_at)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14::jsonb,$15::jsonb,$16::jsonb,$17,$18,$19)`,
-        [task.id, task.title, task.description, task.clientId || null, task.type, task.channel, task.format, task.assigneeId || null, task.priority, task.status, task.dueDate || null, task.publishDate || null, task.approvalRequired, JSON.stringify(task.labels), JSON.stringify(task.checklist), JSON.stringify(task.comments), task.createdById || null, task.createdAt, task.updatedAt]
+        `INSERT INTO tasks (id, title, description, client_id, type, channel, format, assignee_id, assignee_ids, priority, status, due_date, publish_date, approval_required, labels, checklist, subtasks, comments, created_by_id, created_at, updated_at)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,$10,$11,$12,$13,$14,$15::jsonb,$16::jsonb,$17::jsonb,$18::jsonb,$19,$20,$21)`,
+        [task.id, task.title, task.description, task.clientId || null, task.type, task.channel, task.format, task.assigneeId || null, JSON.stringify(task.assigneeIds || []), task.priority, task.status, task.dueDate || null, task.publishDate || null, task.approvalRequired, JSON.stringify(task.labels), JSON.stringify(task.checklist), JSON.stringify(task.subtasks || []), JSON.stringify(task.comments), task.createdById || null, task.createdAt, task.updatedAt]
       );
       return { ...task, attachments: [] };
     },
@@ -1236,7 +1304,7 @@ function daysBetweenDates(fromDateString, toDateString) {
 }
 
 function isTaskOpen(task) {
-  return Boolean(task) && task.status !== 'published';
+  return Boolean(task) && task.status !== 'scheduled';
 }
 
 function buildWorkspaceLink() {
@@ -1256,11 +1324,11 @@ Se te asignó una tarea en ZIA Flow.
 
 Tarea: ${task.title}
 Cliente: ${clientName}
-Estado: ${task.status}
+Estado: ${statusText(task.status)}
 Fecha límite: ${task.dueDate || 'Sin fecha'}
 
 Abre tu panel aquí: ${link}`;
-  const htmlBody = `<p>Hola <strong>${user.name || 'equipo'}</strong>,</p><p>Se te asignó una tarea en <strong>ZIA Flow</strong>.</p><ul><li><strong>Tarea:</strong> ${task.title}</li><li><strong>Cliente:</strong> ${clientName}</li><li><strong>Estado:</strong> ${task.status}</li><li><strong>Fecha límite:</strong> ${task.dueDate || 'Sin fecha'}</li></ul><p><a href="${link}">Abrir ZIA Flow</a></p>`;
+  const htmlBody = `<p>Hola <strong>${user.name || 'equipo'}</strong>,</p><p>Se te asignó una tarea en <strong>ZIA Flow</strong>.</p><ul><li><strong>Tarea:</strong> ${task.title}</li><li><strong>Cliente:</strong> ${clientName}</li><li><strong>Estado:</strong> ${statusText(task.status)}</li><li><strong>Fecha límite:</strong> ${task.dueDate || 'Sin fecha'}</li></ul><p><a href="${link}">Abrir ZIA Flow</a></p>`;
   return { subject, textBody, htmlBody, previewLink: link };
 }
 
@@ -1277,11 +1345,11 @@ function buildTaskReminderEmail(user, task, clientName, kind, meta = {}) {
 
 Tu tarea "${task.title}" ${labels[kind] || 'requiere atención'}.
 Cliente: ${clientName}
-Estado actual: ${task.status}
+Estado actual: ${statusText(task.status)}
 Fecha límite: ${task.dueDate || 'Sin fecha'}
 
 Entra a ZIA Flow: ${link}`;
-  const htmlBody = `<p>Hola <strong>${user.name || 'equipo'}</strong>,</p><p>Tu tarea <strong>${task.title}</strong> ${labels[kind] || 'requiere atención'}.</p><ul><li><strong>Cliente:</strong> ${clientName}</li><li><strong>Estado actual:</strong> ${task.status}</li><li><strong>Fecha límite:</strong> ${task.dueDate || 'Sin fecha'}</li></ul><p><a href="${link}">Abrir ZIA Flow</a></p>`;
+  const htmlBody = `<p>Hola <strong>${user.name || 'equipo'}</strong>,</p><p>Tu tarea <strong>${task.title}</strong> ${labels[kind] || 'requiere atención'}.</p><ul><li><strong>Cliente:</strong> ${clientName}</li><li><strong>Estado actual:</strong> ${statusText(task.status)}</li><li><strong>Fecha límite:</strong> ${task.dueDate || 'Sin fecha'}</li></ul><p><a href="${link}">Abrir ZIA Flow</a></p>`;
   return { subject, textBody, htmlBody, previewLink: link };
 }
 
@@ -1290,9 +1358,9 @@ function buildDailyDigestEmail(user, tasks, clients, timeZone) {
   const link = buildWorkspaceLink();
   const lines = tasks.map((task) => {
     const clientName = getClientName(clients, task.clientId);
-    return `- ${task.title} · ${clientName} · ${task.status} · vence ${task.dueDate || 'sin fecha'}`;
+    return `- ${task.title} · ${clientName} · ${statusText(task.status)} · vence ${task.dueDate || 'sin fecha'}`;
   });
-  const listHtml = tasks.map((task) => `<li><strong>${task.title}</strong> · ${getClientName(clients, task.clientId)} · ${task.status} · vence ${task.dueDate || 'sin fecha'}</li>`).join('');
+  const listHtml = tasks.map((task) => `<li><strong>${task.title}</strong> · ${getClientName(clients, task.clientId)} · ${statusText(task.status)} · vence ${task.dueDate || 'sin fecha'}</li>`).join('');
   const subject = `Resumen diario de tareas pendientes · ${today}`;
   const textBody = `Hola ${user.name || 'equipo'},
 
@@ -1309,16 +1377,22 @@ let reminderRunnerState = { running: false, lastRunAt: '', lastError: '' };
 
 async function maybeSendTaskAssignmentEmail(task, previousTask = null) {
   const settings = await adapter.getNotificationSettings();
-  if (!settings.enabled || !settings.assignmentEmails || !task?.assigneeId || task.status === 'published') return null;
-  const shouldSend = !previousTask || previousTask.assigneeId !== task.assigneeId;
-  if (!shouldSend) return null;
-  const user = await adapter.getUserById(task.assigneeId);
-  if (!user || user.status !== 'active' || !user.email) return null;
+  const currentIds = getTaskAssigneeIds(task);
+  if (!settings.enabled || !settings.assignmentEmails || !currentIds.length || task.status === 'scheduled') return null;
+  const previousIds = previousTask ? getTaskAssigneeIds(previousTask) : [];
+  const targetIds = previousTask ? currentIds.filter((id) => !previousIds.includes(id)) : currentIds;
+  if (!targetIds.length) return null;
   const bootstrapUser = await adapter.listUsers().then((users) => users.find((item) => item.role === 'Admin') || users[0] || { role: 'Admin' });
   const bootstrap = await adapter.getBootstrap(bootstrapUser);
-  const email = buildTaskAssignmentEmail(user, task, getClientName(bootstrap.clients, task.clientId));
-  await sendTransactionalEmail({ to: user.email, ...email });
-  return { ok: true };
+  let sent = 0;
+  for (const userId of targetIds) {
+    const user = await adapter.getUserById(userId);
+    if (!user || user.status !== 'active' || !user.email) continue;
+    const email = buildTaskAssignmentEmail(user, task, getClientName(bootstrap.clients, task.clientId));
+    await sendTransactionalEmail({ to: user.email, ...email });
+    sent += 1;
+  }
+  return { ok: true, sent };
 }
 
 async function processTaskReminders({ triggeredBy = 'system' } = {}) {
@@ -1349,7 +1423,7 @@ async function processTaskReminders({ triggeredBy = 'system' } = {}) {
     let skipped = 0;
 
     for (const user of activeUsers) {
-      const assignedTasks = tasks.filter((task) => task.assigneeId === user.id);
+      const assignedTasks = tasks.filter((task) => getTaskAssigneeIds(task).includes(user.id));
       if (!assignedTasks.length) continue;
 
       const shouldRunDigest = settings.dailyDigestEnabled && allowDigestToday && (triggeredBy !== 'scheduler' || currentHour === Number(settings.dailyDigestHour || 8));
