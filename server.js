@@ -831,6 +831,21 @@ function createPostgresAdapter() {
           preview_link TEXT,
           created_at TIMESTAMPTZ NOT NULL
         );
+        CREATE TABLE IF NOT EXISTS notification_settings (
+          id TEXT PRIMARY KEY,
+          settings JSONB NOT NULL DEFAULT '{}'::jsonb,
+          updated_at TIMESTAMPTZ NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS reminder_events (
+          id TEXT PRIMARY KEY,
+          kind TEXT NOT NULL,
+          dedupe_key TEXT NOT NULL UNIQUE,
+          task_id TEXT REFERENCES tasks(id) ON DELETE SET NULL,
+          user_id TEXT REFERENCES users(id) ON DELETE SET NULL,
+          sent_at TIMESTAMPTZ NOT NULL,
+          meta JSONB NOT NULL DEFAULT '{}'::jsonb,
+          created_at TIMESTAMPTZ NOT NULL
+        );
       `);
       await seedIfNeeded();
       await query('DELETE FROM sessions WHERE expires_at <= NOW()');
