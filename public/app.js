@@ -659,7 +659,7 @@ function renderAdmin() {
             <button class="primary-button" type="submit">Guardar ajustes</button>
             <button class="secondary-button" id="runRemindersButton" type="button">Ejecutar recordatorios ahora</button>
           </div>
-          <p class="small-text">Usa SMTP para invitaciones, recuperación y recordatorios automáticos.</p>
+          <p class="small-text">Usa SMTP para invitaciones, recuperación y recordatorios automáticos. Si SMTP no está configurado, ZIA Flow seguirá registrando el envío en el log interno.</p>
         </form>
       </section>
       <section class="panel">
@@ -678,7 +678,7 @@ function renderAdmin() {
               </div>
               <div class="small-text">Para ${escapeHtml(log.toEmail)} · ${escapeHtml(formatDateTime(log.createdAt))}</div>
               <p class="small-text">${escapeHtml(log.textBody.slice(0, 150))}${log.textBody.length > 150 ? '…' : ''}</p>
-
+              ${log.previewLink ? `<a class="link-button" href="${escapeHtml(log.previewLink)}" target="_blank">Abrir enlace</a>` : ''}
             </article>
           `).join('') : `<div class="empty-state">Todavía no hay envíos registrados.</div>`}
         </div>
@@ -967,7 +967,7 @@ async function saveUserFromForm() {
     state.users.push(user);
   }
   seedSelectOptions();
-  showToast('Usuario guardado', 'Los cambios fueron guardados.');
+  showToast('Usuario guardado', result.previewLink ? `Invitación lista. ${result.previewLink}` : 'Los cambios fueron guardados.');
 }
 
 function bindBoardInteractions() {
@@ -1041,7 +1041,7 @@ function bindDynamicActions() {
       try {
         const result = await api(`/api/admin/users/${button.dataset.sendInvite}/invite`, { method: 'POST' });
         await refreshBootstrap();
-        showToast('Invitación enviada', 'El correo de invitación fue procesado.');
+        showToast('Invitación enviada', result.previewLink || 'El correo de invitación fue procesado.');
       } catch (error) {
         showToast('Error', error.message, 'error');
       }
@@ -1052,7 +1052,7 @@ function bindDynamicActions() {
       try {
         const result = await api(`/api/admin/users/${button.dataset.sendReset}/password-reset`, { method: 'POST' });
         await refreshBootstrap();
-        showToast('Reset enviado', 'El correo de recuperación fue procesado.');
+        showToast('Reset enviado', result.previewLink || 'El correo de recuperación fue procesado.');
       } catch (error) {
         showToast('Error', error.message, 'error');
       }
@@ -1271,8 +1271,10 @@ function bindStaticEvents() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: document.getElementById('forgotEmail').value.trim() })
       });
-      showToast('Solicitud procesada', result.message);
-      activateAuthView('forgot');
+      showToast('Solicitud procesada', result.previewLink || result.message);
+      if (result.previewLink) {
+        window.open(result.previewLink, '_self');
+      }
     } catch (error) {
       showToast('Error', error.message, 'error');
     }
