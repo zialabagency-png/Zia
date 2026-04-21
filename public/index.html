@@ -3,42 +3,30 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>ZIA Flow</title>
+    <title>Zia WorkSpace</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="stylesheet" href="/styles.css" />
   </head>
   <body>
     <div class="grain"></div>
 
     <section class="auth-shell" id="authShell">
-      <div class="auth-card auth-side">
-        <div class="brand-block auth-brand-block">
-          <div class="brand-mark">
-            <span class="brand-zia">zia</span>
-            <span class="brand-lab">LAB</span>
+      <div class="auth-card auth-main auth-single">
+        <div class="auth-header-block">
+          <img class="brand-logo brand-logo-auth" src="/zia-workspace-logo.svg" alt="Zia WorkSpace" />
+          <div class="auth-copy compact">
+            <p class="eyebrow">Zia Lab Agency</p>
+            <h1>Zia WorkSpace</h1>
+            <p class="small-text">Un tablero visual para contenido, clientes, usuarios y aprobaciones.</p>
           </div>
-          <p class="brand-subtitle">Flow workspace para agencia</p>
         </div>
 
-        <div class="auth-copy">
-          <p class="eyebrow">Gestión de agencia</p>
-          <h1>Un tablero visual para contenido, clientes, usuarios y aprobaciones</h1>
-          <p class="small-text">Estilo ZIA inspirado en Trello + Monday, con PostgreSQL, adjuntos, recuperación de contraseña e invitaciones por email.</p>
+        <div class="auth-tabs">
+          <button type="button" class="auth-tab active" data-auth-view="login">Entrar</button>
+          <button type="button" class="auth-tab" data-auth-view="forgot">Recuperar clave</button>
         </div>
 
-        <div class="hint-card">
-          <strong>Acceso privado</strong>
-          <span>Ingresa con tu correo corporativo y tu contraseña activa.</span>
-          <span>Si necesitas acceso, solicita invitación al administrador.</span>
-        </div>
-      </div>
-
-      <div class="auth-card auth-main">
-        <div class="auth-tabs" id="authTabs" role="tablist" aria-label="Acceso">
-          <button type="button" class="auth-tab active" data-auth-view="login" aria-selected="true" aria-controls="loginView">Entrar</button>
-          <button type="button" class="auth-tab" data-auth-view="forgot" aria-selected="false" aria-controls="forgotView">Recuperar clave</button>
-        </div>
-
-        <form class="stack-form auth-view active" id="loginView" data-auth-panel="login">
+        <form class="stack-form auth-view active" id="loginView">
           <label class="field">
             <span>Correo</span>
             <input id="loginEmail" type="email" placeholder="correo@tudominio.com" required />
@@ -47,10 +35,10 @@
             <span>Contraseña</span>
             <input id="loginPassword" type="password" placeholder="••••••••" required />
           </label>
-          <button class="primary-button" type="submit">Entrar a ZIA Flow</button>
+          <button class="primary-button" type="submit">Entrar a Zia WorkSpace</button>
         </form>
 
-        <form class="stack-form auth-view" id="forgotView" data-auth-panel="forgot" hidden>
+        <form class="stack-form auth-view" id="forgotView">
           <label class="field">
             <span>Correo de la cuenta</span>
             <input id="forgotEmail" type="email" placeholder="correo@tudominio.com" required />
@@ -59,7 +47,7 @@
           <p class="small-text">Te enviaremos un enlace seguro para restablecer tu contraseña.</p>
         </form>
 
-        <form class="stack-form auth-view" id="tokenView" data-auth-panel="token" hidden>
+        <form class="stack-form auth-view" id="tokenView">
           <div id="tokenIntro" class="hint-card no-top"></div>
           <label class="field" id="tokenNameFieldWrap">
             <span>Nombre</span>
@@ -75,19 +63,12 @@
     </section>
 
     <div class="app-shell hidden" id="appShell">
-      <button type="button" class="mobile-nav-toggle hidden" id="mobileNavToggle" aria-label="Abrir menú">☰</button>
-      <div class="app-overlay hidden" id="appOverlay"></div>
+      <div class="sidebar-scrim hidden" id="sidebarScrim"></div>
       <aside class="sidebar" id="sidebar">
-        <div class="sidebar-mobile-head">
-          <span>Menú</span>
-          <button type="button" class="close-button sidebar-close" id="sidebarCloseButton" aria-label="Cerrar menú">✕</button>
-        </div>
-        <div class="brand-block">
-          <div class="brand-mark">
-            <span class="brand-zia">zia</span>
-            <span class="brand-lab">LAB</span>
-          </div>
-          <p class="brand-subtitle">Flow workspace para agencia</p>
+        <div class="brand-block sidebar-brand">
+          <button class="close-button sidebar-close hidden-desktop" id="sidebarCloseButton" type="button" aria-label="Cerrar menú">✕</button>
+          <img class="brand-logo" src="/zia-workspace-logo.svg" alt="Zia WorkSpace" />
+          <p class="brand-subtitle">Zia WorkSpace</p>
         </div>
 
         <nav class="nav" id="navTabs">
@@ -107,12 +88,12 @@
 
       <main class="main-content">
         <header class="topbar">
-          <div class="topbar-title-block">
-            <button type="button" class="mobile-inline-menu hidden" id="mobileInlineMenuButton" aria-label="Abrir menú">☰</button>
+          <div class="topbar-title-group">
+            <button class="ghost-button icon-button mobile-menu-button hidden-desktop" id="mobileMenuButton" type="button" aria-label="Abrir menú">☰</button>
             <div>
-            <p class="eyebrow" id="topbarEyebrow">ZIA Lab</p>
-            <h1 id="pageTitle">Dashboard</h1>
-          </div>
+              <p class="eyebrow" id="topbarEyebrow">Zia WorkSpace</p>
+              <h1 id="pageTitle">Dashboard</h1>
+            </div>
           </div>
           <div class="topbar-actions">
             <button class="ghost-button" id="newClientButton">Nuevo cliente</button>
@@ -195,10 +176,10 @@
               <span>Formato</span>
               <input id="taskFormat" placeholder="1080x1350, Vertical 9:16..." />
             </label>
-            <div class="field full-row">
-              <span>Responsables</span>
-              <div id="taskAssigneesBox" class="assignee-check-grid"></div>
-            </div>
+            <label class="field">
+              <span>Responsable</span>
+              <select id="taskAssignee"></select>
+            </label>
             <label class="field">
               <span>Prioridad</span>
               <select id="taskPriority">
@@ -235,17 +216,6 @@
               <span>Comentario nuevo</span>
               <textarea id="taskComment" rows="3" placeholder="Nota interna adicional"></textarea>
             </label>
-          </div>
-
-          <div class="panel inner-panel">
-            <div class="panel-header compact-head">
-              <div>
-                <h4 class="panel-title no-margin">Subtareas</h4>
-                <p class="small-text">Organiza entregables internos para diseño, content o revisión.</p>
-              </div>
-              <button class="secondary-button" type="button" id="addSubtaskButton">Agregar subtarea</button>
-            </div>
-            <div class="subtask-editor-list" id="taskSubtasksList"></div>
           </div>
 
           <div class="panel inner-panel">
