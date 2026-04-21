@@ -135,8 +135,19 @@ h4 {
 .auth-header-block {
   display: grid;
   gap: 18px;
-  margin-bottom: 8px;
 }
+
+.auth-shell .auth-card {
+  max-width: 560px;
+  width: min(100%, 560px);
+  margin-inline: auto;
+}
+
+.auth-panels {
+  display: grid;
+  gap: 0;
+}
+
 
 .auth-copy.compact h1 {
   font-size: clamp(1.8rem, 4vw, 2.6rem);
@@ -254,11 +265,16 @@ h4 {
 }
 
 .auth-view {
-  display: none;
+  display: none !important;
+  margin-top: 0;
 }
 
 .auth-view.active {
-  display: grid;
+  display: grid !important;
+}
+
+.auth-view[hidden] {
+  display: none !important;
 }
 
 .stack-form,
@@ -1047,4 +1063,27 @@ code {
   inset: 0;
   background: rgba(4, 7, 12, 0.62);
   z-index: 18;
+}
+
+
+@media (max-width: 860px) {
+  .auth-shell .auth-card {
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .auth-header-block {
+    gap: 14px;
+  }
+
+  .auth-tabs {
+    width: 100%;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .auth-tab {
+    width: 100%;
+    text-align: center;
+  }
 }

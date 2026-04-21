@@ -21,12 +21,13 @@
           </div>
         </div>
 
-        <div class="auth-tabs">
-          <button type="button" class="auth-tab active" data-auth-view="login">Entrar</button>
-          <button type="button" class="auth-tab" data-auth-view="forgot">Recuperar clave</button>
+        <div class="auth-tabs" role="tablist" aria-label="Acceso">
+          <button type="button" class="auth-tab active" id="authTabLogin" role="tab" aria-selected="true" aria-controls="loginView" data-auth-view="login">Entrar</button>
+          <button type="button" class="auth-tab" id="authTabForgot" role="tab" aria-selected="false" aria-controls="forgotView" data-auth-view="forgot">Recuperar clave</button>
         </div>
 
-        <form class="stack-form auth-view active" id="loginView">
+        <div class="auth-panels" id="authPanels">
+        <form class="stack-form auth-view active" id="loginView" role="tabpanel" aria-labelledby="authTabLogin">
           <label class="field">
             <span>Correo</span>
             <input id="loginEmail" type="email" placeholder="correo@tudominio.com" required />
@@ -38,7 +39,7 @@
           <button class="primary-button" type="submit">Entrar a Zia WorkSpace</button>
         </form>
 
-        <form class="stack-form auth-view" id="forgotView">
+        <form class="stack-form auth-view" id="forgotView" role="tabpanel" aria-labelledby="authTabForgot" hidden>
           <label class="field">
             <span>Correo de la cuenta</span>
             <input id="forgotEmail" type="email" placeholder="correo@tudominio.com" required />
@@ -47,7 +48,7 @@
           <p class="small-text">Te enviaremos un enlace seguro para restablecer tu contraseña.</p>
         </form>
 
-        <form class="stack-form auth-view" id="tokenView">
+        <form class="stack-form auth-view" id="tokenView" role="tabpanel" hidden>
           <div id="tokenIntro" class="hint-card no-top"></div>
           <label class="field" id="tokenNameFieldWrap">
             <span>Nombre</span>
@@ -59,6 +60,7 @@
           </label>
           <button class="primary-button" type="submit" id="tokenButton">Guardar y entrar</button>
         </form>
+        </div>
       </div>
     </section>
 

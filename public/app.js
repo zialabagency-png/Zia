@@ -71,6 +71,9 @@ const els = {
   loginView: document.getElementById('loginView'),
   forgotView: document.getElementById('forgotView'),
   tokenView: document.getElementById('tokenView'),
+  authPanels: document.getElementById('authPanels'),
+  authTabLogin: document.getElementById('authTabLogin'),
+  authTabForgot: document.getElementById('authTabForgot'),
   tokenIntro: document.getElementById('tokenIntro'),
   tokenNameFieldWrap: document.getElementById('tokenNameFieldWrap'),
   tokenButton: document.getElementById('tokenButton'),
@@ -1179,12 +1182,41 @@ function closeSidebar() {
 }
 
 function activateAuthView(view) {
-  [...document.querySelectorAll('.auth-tab')].forEach((button) => {
-    button.classList.toggle('active', button.dataset.authView === view);
+  state.authMode = view;
+  if (els.authPanels) {
+    els.authPanels.dataset.activeView = view;
+  }
+
+  const authTabs = [...document.querySelectorAll('.auth-tab')];
+  authTabs.forEach((button) => {
+    const isActive = button.dataset.authView === view;
+    button.classList.toggle('active', isActive);
+    button.setAttribute('aria-selected', isActive ? 'true' : 'false');
+    button.tabIndex = isActive ? 0 : -1;
   });
-  els.loginView.classList.toggle('active', view === 'login');
-  els.forgotView.classList.toggle('active', view === 'forgot');
-  els.tokenView.classList.toggle('active', view === 'token');
+
+  const panels = [
+    { el: els.loginView, active: view === 'login' },
+    { el: els.forgotView, active: view === 'forgot' },
+    { el: els.tokenView, active: view === 'token' }
+  ];
+
+  panels.forEach(({ el, active }) => {
+    if (!el) return;
+    el.classList.toggle('active', active);
+    if (active) {
+      el.removeAttribute('hidden');
+    } else {
+      el.setAttribute('hidden', 'hidden');
+    }
+  });
+
+  if (view === 'login') {
+    document.getElementById('loginEmail')?.focus({ preventScroll: true });
+  }
+  if (view === 'forgot') {
+    document.getElementById('forgotEmail')?.focus({ preventScroll: true });
+  }
 }
 
 function openApp() {
@@ -1200,7 +1232,12 @@ function closeAllModals() {
 
 function bindStaticEvents() {
   document.querySelectorAll('.auth-tab').forEach((button) => {
-    button.addEventListener('click', () => activateAuthView(button.dataset.authView));
+    button.addEventListener('click', (event) => {
+      event.preventDefault();
+      const view = button.dataset.authView;
+      if (!view) return;
+      activateAuthView(view);
+    });
   });
 
   els.mobileMenuButton?.addEventListener('click', openSidebar);
@@ -1235,6 +1272,7 @@ function bindStaticEvents() {
         body: JSON.stringify({ email: document.getElementById('forgotEmail').value.trim() })
       });
       showToast('Solicitud procesada', result.message);
+      activateAuthView('forgot');
     } catch (error) {
       showToast('Error', error.message, 'error');
     }
