@@ -65,6 +65,12 @@ const els = {
   newClientButton: document.getElementById('newClientButton'),
   newUserButton: document.getElementById('newUserButton'),
   logoutButton: document.getElementById('logoutButton'),
+  authTabs: document.getElementById('authTabs'),
+  mobileNavToggle: document.getElementById('mobileNavToggle'),
+  mobileInlineMenuButton: document.getElementById('mobileInlineMenuButton'),
+  sidebar: document.getElementById('sidebar'),
+  sidebarCloseButton: document.getElementById('sidebarCloseButton'),
+  appOverlay: document.getElementById('appOverlay'),
   globalSearch: document.getElementById('globalSearch'),
   clientFilter: document.getElementById('clientFilter'),
   assigneeFilter: document.getElementById('assigneeFilter'),
@@ -1616,18 +1622,46 @@ async function handleSessionBoot() {
   }
 }
 
+function setMobileSidebarState(isOpen) {
+  const mobile = window.matchMedia('(max-width: 980px)').matches;
+  if (!mobile) {
+    els.sidebar?.classList.remove('sidebar-open');
+    els.appOverlay?.classList.add('hidden');
+    return;
+  }
+  els.sidebar?.classList.toggle('sidebar-open', isOpen);
+  els.appOverlay?.classList.toggle('hidden', !isOpen);
+}
+
 function activateAuthView(view) {
-  [...document.querySelectorAll('.auth-tab')].forEach((button) => {
-    button.classList.toggle('active', button.dataset.authView === view);
+  state.authMode = view;
+  document.querySelectorAll('.auth-tab').forEach((button) => {
+    const isActive = button.dataset.authView === view;
+    button.classList.toggle('active', isActive);
+    button.setAttribute('aria-selected', String(isActive));
   });
-  els.loginView.classList.toggle('active', view === 'login');
-  els.forgotView.classList.toggle('active', view === 'forgot');
-  els.tokenView.classList.toggle('active', view === 'token');
+  [
+    { key: 'login', el: els.loginView },
+    { key: 'forgot', el: els.forgotView },
+    { key: 'token', el: els.tokenView }
+  ].forEach(({ key, el }) => {
+    const isActive = key === view;
+    el.classList.toggle('active', isActive);
+    el.toggleAttribute('hidden', !isActive);
+    if (!isActive) el.reset?.();
+  });
+  if (view === 'forgot') {
+    document.getElementById('forgotEmail')?.focus({ preventScroll: false });
+  }
+  if (view === 'login') {
+    document.getElementById('loginEmail')?.focus({ preventScroll: false });
+  }
 }
 
 function openApp() {
   els.authShell.classList.add('hidden');
   els.appShell.classList.remove('hidden');
+  setMobileSidebarState(false);
 }
 
 function closeAllModals() {
@@ -1637,9 +1671,18 @@ function closeAllModals() {
 }
 
 function bindStaticEvents() {
-  document.querySelectorAll('.auth-tab').forEach((button) => {
-    button.addEventListener('click', () => activateAuthView(button.dataset.authView));
+  els.authTabs?.addEventListener('click', (event) => {
+    const button = event.target.closest('.auth-tab');
+    if (!button) return;
+    event.preventDefault();
+    activateAuthView(button.dataset.authView);
   });
+
+  els.mobileNavToggle?.addEventListener('click', () => setMobileSidebarState(true));
+  els.mobileInlineMenuButton?.addEventListener('click', () => setMobileSidebarState(true));
+  els.sidebarCloseButton?.addEventListener('click', () => setMobileSidebarState(false));
+  els.appOverlay?.addEventListener('click', () => setMobileSidebarState(false));
+  window.addEventListener('resize', () => setMobileSidebarState(false));
 
   els.loginView.addEventListener('submit', async (event) => {
     event.preventDefault();
@@ -1702,6 +1745,7 @@ function bindStaticEvents() {
     state.tab = button.dataset.tab;
     render();
     bindDynamicActions();
+    setMobileSidebarState(false);
   });
 
   els.newTaskButton.addEventListener('click', () => openTaskModal());

@@ -33,12 +33,12 @@
       </div>
 
       <div class="auth-card auth-main">
-        <div class="auth-tabs">
-          <button class="auth-tab active" data-auth-view="login">Entrar</button>
-          <button class="auth-tab" data-auth-view="forgot">Recuperar clave</button>
+        <div class="auth-tabs" id="authTabs" role="tablist" aria-label="Acceso">
+          <button type="button" class="auth-tab active" data-auth-view="login" aria-selected="true" aria-controls="loginView">Entrar</button>
+          <button type="button" class="auth-tab" data-auth-view="forgot" aria-selected="false" aria-controls="forgotView">Recuperar clave</button>
         </div>
 
-        <form class="stack-form auth-view active" id="loginView">
+        <form class="stack-form auth-view active" id="loginView" data-auth-panel="login">
           <label class="field">
             <span>Correo</span>
             <input id="loginEmail" type="email" placeholder="correo@tudominio.com" required />
@@ -50,7 +50,7 @@
           <button class="primary-button" type="submit">Entrar a ZIA Flow</button>
         </form>
 
-        <form class="stack-form auth-view" id="forgotView">
+        <form class="stack-form auth-view" id="forgotView" data-auth-panel="forgot" hidden>
           <label class="field">
             <span>Correo de la cuenta</span>
             <input id="forgotEmail" type="email" placeholder="correo@tudominio.com" required />
@@ -59,7 +59,7 @@
           <p class="small-text">Te enviaremos un enlace seguro para restablecer tu contraseña.</p>
         </form>
 
-        <form class="stack-form auth-view" id="tokenView">
+        <form class="stack-form auth-view" id="tokenView" data-auth-panel="token" hidden>
           <div id="tokenIntro" class="hint-card no-top"></div>
           <label class="field" id="tokenNameFieldWrap">
             <span>Nombre</span>
@@ -75,7 +75,13 @@
     </section>
 
     <div class="app-shell hidden" id="appShell">
-      <aside class="sidebar">
+      <button type="button" class="mobile-nav-toggle hidden" id="mobileNavToggle" aria-label="Abrir menú">☰</button>
+      <div class="app-overlay hidden" id="appOverlay"></div>
+      <aside class="sidebar" id="sidebar">
+        <div class="sidebar-mobile-head">
+          <span>Menú</span>
+          <button type="button" class="close-button sidebar-close" id="sidebarCloseButton" aria-label="Cerrar menú">✕</button>
+        </div>
         <div class="brand-block">
           <div class="brand-mark">
             <span class="brand-zia">zia</span>
@@ -101,9 +107,12 @@
 
       <main class="main-content">
         <header class="topbar">
-          <div>
+          <div class="topbar-title-block">
+            <button type="button" class="mobile-inline-menu hidden" id="mobileInlineMenuButton" aria-label="Abrir menú">☰</button>
+            <div>
             <p class="eyebrow" id="topbarEyebrow">ZIA Lab</p>
             <h1 id="pageTitle">Dashboard</h1>
+          </div>
           </div>
           <div class="topbar-actions">
             <button class="ghost-button" id="newClientButton">Nuevo cliente</button>
