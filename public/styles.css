@@ -1087,3 +1087,78 @@ code {
     text-align: center;
   }
 }
+
+
+.auth-header-login {
+  justify-items: center;
+  text-align: center;
+  gap: 22px;
+  margin-bottom: 6px;
+}
+
+.auth-logo-frame {
+  width: 188px;
+  height: 188px;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  border-radius: 34px;
+  background: rgba(0, 0, 0, 0.58);
+  border: 1px solid rgba(77, 139, 255, 0.16);
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.02), 0 18px 44px rgba(0,0,0,0.28);
+}
+
+.brand-logo-auth-icon {
+  width: 100%;
+  max-width: 152px;
+  object-fit: contain;
+}
+
+.auth-copy-login h1 {
+  margin-bottom: 10px;
+  font-size: clamp(2.8rem, 6vw, 4.2rem);
+  letter-spacing: -0.05em;
+}
+
+.auth-copy-login .small-text {
+  max-width: 28ch;
+  font-size: 0.98rem;
+}
+
+.brand-logo-auth {
+  width: min(100%, 360px);
+}
+
+@media (max-width: 860px) {
+  .auth-logo-frame {
+    width: 156px;
+    height: 156px;
+    padding: 14px;
+    border-radius: 30px;
+  }
+
+  .brand-logo-auth-icon {
+    max-width: 122px;
+  }
+
+  .auth-copy-login h1 {
+    font-size: clamp(2.4rem, 9vw, 3.4rem);
+  }
+}
+
+@media (max-width: 560px) {
+  .auth-logo-frame {
+    width: 132px;
+    height: 132px;
+    padding: 12px;
+    border-radius: 26px;
+  }
+
+  .brand-logo-auth-icon {
+    max-width: 102px;
+  }
+
+  .auth-copy-login .small-text {
+    max-width: 24ch;
+  }
+}
