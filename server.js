@@ -404,14 +404,21 @@ function todayDateKey() {
 function defaultSeedData() {
   const currentTime = nowIso();
   const adminPassword = hashPassword(process.env.SEED_ADMIN_PASSWORD || 'ZiaFlow2026!');
+  const seedAdminEmail = String(process.env.SEED_ADMIN_EMAIL || process.env.SMTP_USER || 'admin@zialab.com').trim().toLowerCase();
+  const derivedDomain = seedAdminEmail.includes('@') ? seedAdminEmail.split('@')[1] : 'zialab.com';
+  const seedDomain = String(process.env.SEED_EMAIL_DOMAIN || derivedDomain || 'zialab.com').trim().toLowerCase();
+  const contentEmail = String(process.env.SEED_CONTENT_EMAIL || `content@${seedDomain}`).trim().toLowerCase();
+  const designEmail = String(process.env.SEED_DESIGN_EMAIL || `design@${seedDomain}`).trim().toLowerCase();
+  const devEmail = String(process.env.SEED_DEV_EMAIL || `dev@${seedDomain}`).trim().toLowerCase();
+  const videoEmail = String(process.env.SEED_VIDEO_EMAIL || `video@${seedDomain}`).trim().toLowerCase();
   return {
     brand: { name: 'ZIA Flow', subtitle: 'Agency Workspace' },
     users: [
-      { id: 'u1', name: 'Zia', email: 'zia@agency.local', role: 'Admin', accent: 'admin', status: 'active', passwordHash: adminPassword, createdAt: currentTime, updatedAt: currentTime, lastLoginAt: '' },
-      { id: 'u2', name: 'Emely', email: 'emely@agency.local', role: 'Content Manager', accent: 'content', status: 'active', passwordHash: adminPassword, createdAt: currentTime, updatedAt: currentTime, lastLoginAt: '' },
-      { id: 'u3', name: 'Franny', email: 'franny@agency.local', role: 'Designer', accent: 'design', status: 'active', passwordHash: adminPassword, createdAt: currentTime, updatedAt: currentTime, lastLoginAt: '' },
-      { id: 'u4', name: 'Jhofrankny', email: 'jh@agency.local', role: 'Developer', accent: 'dev', status: 'active', passwordHash: adminPassword, createdAt: currentTime, updatedAt: currentTime, lastLoginAt: '' },
-      { id: 'u5', name: 'Andrea', email: 'andrea@agency.local', role: 'Video Editor', accent: 'video', status: 'active', passwordHash: adminPassword, createdAt: currentTime, updatedAt: currentTime, lastLoginAt: '' }
+      { id: 'u1', name: 'Zia', email: seedAdminEmail, role: 'Admin', accent: 'admin', status: 'active', passwordHash: adminPassword, createdAt: currentTime, updatedAt: currentTime, lastLoginAt: '' },
+      { id: 'u2', name: 'Emely', email: contentEmail, role: 'Content Manager', accent: 'content', status: 'active', passwordHash: adminPassword, createdAt: currentTime, updatedAt: currentTime, lastLoginAt: '' },
+      { id: 'u3', name: 'Franny', email: designEmail, role: 'Designer', accent: 'design', status: 'active', passwordHash: adminPassword, createdAt: currentTime, updatedAt: currentTime, lastLoginAt: '' },
+      { id: 'u4', name: 'Jhofrankny', email: devEmail, role: 'Developer', accent: 'dev', status: 'active', passwordHash: adminPassword, createdAt: currentTime, updatedAt: currentTime, lastLoginAt: '' },
+      { id: 'u5', name: 'Andrea', email: videoEmail, role: 'Video Editor', accent: 'video', status: 'active', passwordHash: adminPassword, createdAt: currentTime, updatedAt: currentTime, lastLoginAt: '' }
     ],
     clients: [
       { id: 'c1', name: 'Terramarine', handle: '@terramarine.rd', service: 'Gestión de redes + campañas', plan: 'Mensual', status: 'Activo', ownerId: 'u2', channels: ['Instagram', 'Facebook', 'TikTok'], notes: 'Enfoque en paquetes y experiencias premium.', createdAt: currentTime, updatedAt: currentTime },
@@ -1853,7 +1860,7 @@ app.post('/api/auth/forgot-password', async (req, res, next) => {
       const delivery = await sendResetEmail(user);
       if (delivery.mode === 'log') previewLink = delivery.link;
     }
-    res.json({ ok: true, message: 'Si el correo existe, enviamos un enlace para recuperar la contraseña.', previewLink });
+    res.json({ ok: true, message: 'Si el correo existe, te enviaremos un enlace seguro para recuperar la contraseña.' });
   } catch (error) {
     next(error);
   }
@@ -2231,7 +2238,7 @@ app.post('/api/admin/users', requireAuth, requireAdmin, async (req, res, next) =
       previewLink = delivery.mode === 'log' ? delivery.link : '';
       deliveryMode = delivery.mode;
     }
-    res.status(201).json({ ok: true, user, previewLink, deliveryMode });
+    res.status(201).json({ ok: true, user, deliveryMode, message: (sendInvite || !password) ? 'Usuario creado y correo de invitación enviado.' : 'Usuario creado correctamente.' });
   } catch (error) {
     next(error);
   }
@@ -2293,7 +2300,7 @@ app.post('/api/admin/users/:id/invite', requireAuth, requireAdmin, async (req, r
     }
     const delivery = await sendInviteEmail(user);
     await adapter.updateUser(user.id, { ...user, status: 'invited', updatedAt: nowIso() });
-    res.json({ ok: true, previewLink: delivery.mode === 'log' ? delivery.link : '', deliveryMode: delivery.mode });
+    res.json({ ok: true, deliveryMode: delivery.mode, message: 'Invitación enviada.' });
   } catch (error) {
     next(error);
   }
@@ -2307,7 +2314,7 @@ app.post('/api/admin/users/:id/password-reset', requireAuth, requireAdmin, async
       return;
     }
     const delivery = await sendResetEmail(user);
-    res.json({ ok: true, previewLink: delivery.mode === 'log' ? delivery.link : '', deliveryMode: delivery.mode });
+    res.json({ ok: true, deliveryMode: delivery.mode, message: 'Correo de recuperación enviado.' });
   } catch (error) {
     next(error);
   }
