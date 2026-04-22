@@ -2047,17 +2047,19 @@ app.put('/api/work/session/today', requireAuth, async (req, res, next) => {
 app.post('/api/work/check-in', requireAuth, async (req, res, next) => {
   try {
     const existing = await adapter.getWorkSessionForDate(req.currentUser.id, todayDateKey());
+    const now = nowIso();
+    const shouldRestartSession = !existing?.checkInAt || Boolean(existing?.checkOutAt);
     const session = await adapter.saveWorkSession({
       ...(existing || {}),
       userId: req.currentUser.id,
       dateKey: todayDateKey(),
-      checkInAt: existing?.checkInAt || nowIso(),
-      checkOutAt: existing?.checkOutAt || '',
-      status: req.body.status || existing?.status || 'available',
+      checkInAt: shouldRestartSession ? now : existing.checkInAt,
+      checkOutAt: shouldRestartSession ? '' : (existing?.checkOutAt || ''),
+      status: req.body.status || (shouldRestartSession ? 'available' : (existing?.status || 'available')),
       focusPlan: req.body.focusPlan ?? existing?.focusPlan ?? '',
       endSummary: req.body.endSummary ?? existing?.endSummary ?? '',
       blockers: req.body.blockers ?? existing?.blockers ?? '',
-      updatedAt: nowIso()
+      updatedAt: now
     });
     if (typeof adapter.createActivityLog === 'function') await adapter.createActivityLog({ userId: req.currentUser.id, kind: 'check_in', label: 'Marcó entrada remota.', entityType: 'work_session', entityId: session.id, meta: { status: session.status } });
     res.json({ ok: true, session });
