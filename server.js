@@ -415,12 +415,14 @@ function workStatusText(value) {
 function normalizeWorkSession(session = {}) {
   const now = nowIso();
   const dateKey = normalizeDate(session.dateKey || session.checkInAt || session.createdAt || new Date());
+  const accruedMinutes = Number.isFinite(Number(session.accruedMinutes)) ? Math.max(0, Math.floor(Number(session.accruedMinutes))) : 0;
   return {
     id: session.id || generateId('ws'),
     userId: String(session.userId || '').trim(),
     dateKey,
     checkInAt: session.checkInAt || '',
     checkOutAt: session.checkOutAt || '',
+    accruedMinutes,
     status: mapWorkStatus(session.status),
     focusPlan: String(session.focusPlan || '').trim(),
     endSummary: String(session.endSummary || '').trim(),
@@ -477,8 +479,8 @@ function defaultSeedData() {
     emailTokens: [],
     emailLogs: [],
     workSessions: [
-      { id: 'ws1', userId: 'u2', dateKey: todayDateKey(), checkInAt: currentTime, checkOutAt: '', status: 'focus', focusPlan: 'Completar copies del calendario y revisar captions de promociones.', endSummary: '', blockers: '', createdAt: currentTime, updatedAt: currentTime },
-      { id: 'ws2', userId: 'u3', dateKey: todayDateKey(), checkInAt: currentTime, checkOutAt: '', status: 'available', focusPlan: 'Diseñar piezas del calendario y propuesta visual de cliente dental.', endSummary: '', blockers: '', createdAt: currentTime, updatedAt: currentTime }
+      { id: 'ws1', userId: 'u2', dateKey: todayDateKey(), checkInAt: currentTime, checkOutAt: '', accruedMinutes: 0, status: 'focus', focusPlan: 'Completar copies del calendario y revisar captions de promociones.', endSummary: '', blockers: '', createdAt: currentTime, updatedAt: currentTime },
+      { id: 'ws2', userId: 'u3', dateKey: todayDateKey(), checkInAt: currentTime, checkOutAt: '', accruedMinutes: 0, status: 'available', focusPlan: 'Diseñar piezas del calendario y propuesta visual de cliente dental.', endSummary: '', blockers: '', createdAt: currentTime, updatedAt: currentTime }
     ],
     activityLogs: [
       { id: 'act1', userId: 'u2', kind: 'session', label: 'Inició su jornada remota.', entityType: 'work_session', entityId: 'ws1', meta: { source: 'seed' }, createdAt: currentTime },
@@ -942,10 +944,10 @@ function createPostgresAdapter() {
     }
     for (const session of seed.workSessions.map(normalizeWorkSession)) {
       await query(
-        `INSERT INTO work_sessions (id, user_id, date_key, check_in_at, check_out_at, status, focus_plan, end_summary, blockers, created_at, updated_at)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+        `INSERT INTO work_sessions (id, user_id, date_key, check_in_at, check_out_at, accrued_minutes, status, focus_plan, end_summary, blockers, created_at, updated_at)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
          ON CONFLICT (user_id, date_key) DO NOTHING`,
-        [session.id, session.userId, session.dateKey, session.checkInAt || null, session.checkOutAt || null, session.status, session.focusPlan, session.endSummary, session.blockers, session.createdAt, session.updatedAt]
+        [session.id, session.userId, session.dateKey, session.checkInAt || null, session.checkOutAt || null, session.accruedMinutes || 0, session.status, session.focusPlan, session.endSummary, session.blockers, session.createdAt, session.updatedAt]
       );
     }
     for (const log of seed.activityLogs.map(normalizeActivityLog)) {
@@ -1036,6 +1038,7 @@ function createPostgresAdapter() {
       dateKey: row.date_key,
       checkInAt: row.check_in_at || '',
       checkOutAt: row.check_out_at || '',
+      accruedMinutes: row.accrued_minutes || 0,
       status: row.status,
       focusPlan: row.focus_plan || '',
       endSummary: row.end_summary || '',
@@ -1155,6 +1158,7 @@ function createPostgresAdapter() {
           date_key DATE NOT NULL,
           check_in_at TIMESTAMPTZ,
           check_out_at TIMESTAMPTZ,
+          accrued_minutes INTEGER NOT NULL DEFAULT 0,
           status TEXT NOT NULL,
           focus_plan TEXT,
           end_summary TEXT,
@@ -1191,6 +1195,7 @@ function createPostgresAdapter() {
       `);
       await query(`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS assignee_ids JSONB NOT NULL DEFAULT '[]'::jsonb`);
       await query(`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS subtasks JSONB NOT NULL DEFAULT '[]'::jsonb`);
+      await query(`ALTER TABLE work_sessions ADD COLUMN IF NOT EXISTS accrued_minutes INTEGER NOT NULL DEFAULT 0`);
       await query(`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS resource_links JSONB NOT NULL DEFAULT '[]'::jsonb`);
       await query(`UPDATE tasks SET assignee_ids = CASE WHEN assignee_id IS NULL OR assignee_id = '' THEN '[]'::jsonb ELSE jsonb_build_array(assignee_id) END WHERE assignee_ids IS NULL OR assignee_ids = '[]'::jsonb`);
       await seedIfNeeded();
@@ -1466,17 +1471,18 @@ function createPostgresAdapter() {
       const base = payload.id ? await query('SELECT * FROM work_sessions WHERE id=$1 LIMIT 1', [payload.id]).then((res) => res.rows[0] ? mapWorkSessionRow(res.rows[0]) : null) : await this.getWorkSessionForDate(payload.userId, normalizeDate(payload.dateKey));
       const session = normalizeWorkSession({ ...base, ...payload, id: base?.id || payload.id, updatedAt: nowIso() });
       await query(
-        `INSERT INTO work_sessions (id, user_id, date_key, check_in_at, check_out_at, status, focus_plan, end_summary, blockers, created_at, updated_at)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+        `INSERT INTO work_sessions (id, user_id, date_key, check_in_at, check_out_at, accrued_minutes, status, focus_plan, end_summary, blockers, created_at, updated_at)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
          ON CONFLICT (user_id, date_key) DO UPDATE SET
            check_in_at = EXCLUDED.check_in_at,
            check_out_at = EXCLUDED.check_out_at,
+           accrued_minutes = EXCLUDED.accrued_minutes,
            status = EXCLUDED.status,
            focus_plan = EXCLUDED.focus_plan,
            end_summary = EXCLUDED.end_summary,
            blockers = EXCLUDED.blockers,
            updated_at = EXCLUDED.updated_at`,
-        [session.id, session.userId, session.dateKey, session.checkInAt || null, session.checkOutAt || null, session.status, session.focusPlan, session.endSummary, session.blockers, session.createdAt, session.updatedAt]
+        [session.id, session.userId, session.dateKey, session.checkInAt || null, session.checkOutAt || null, session.accruedMinutes || 0, session.status, session.focusPlan, session.endSummary, session.blockers, session.createdAt, session.updatedAt]
       );
       return session;
     },
@@ -2104,6 +2110,7 @@ app.put('/api/work/session/today', requireAuth, async (req, res, next) => {
       blockers: req.body.blockers ?? existing?.blockers ?? '',
       checkInAt: existing?.checkInAt || '',
       checkOutAt: existing?.checkOutAt || '',
+      accruedMinutes: existing?.accruedMinutes || 0,
       updatedAt: nowIso()
     });
     if (typeof adapter.createActivityLog === 'function') await adapter.createActivityLog({ userId: req.currentUser.id, kind: 'session_update', label: 'Actualizó su jornada remota.', entityType: 'work_session', entityId: session.id, meta: { status: session.status } });
@@ -2117,20 +2124,21 @@ app.post('/api/work/check-in', requireAuth, async (req, res, next) => {
   try {
     const existing = await adapter.getWorkSessionForDate(req.currentUser.id, todayDateKey());
     const now = nowIso();
-    const shouldRestartSession = !existing?.checkInAt || Boolean(existing?.checkOutAt);
+    const hasOpenSession = Boolean(existing?.checkInAt && !existing?.checkOutAt);
     const session = await adapter.saveWorkSession({
       ...(existing || {}),
       userId: req.currentUser.id,
       dateKey: todayDateKey(),
-      checkInAt: shouldRestartSession ? now : existing.checkInAt,
-      checkOutAt: shouldRestartSession ? '' : (existing?.checkOutAt || ''),
-      status: req.body.status || (shouldRestartSession ? 'available' : (existing?.status || 'available')),
+      checkInAt: hasOpenSession ? existing.checkInAt : now,
+      checkOutAt: hasOpenSession ? '' : '',
+      accruedMinutes: existing?.accruedMinutes || 0,
+      status: req.body.status || existing?.status || 'available',
       focusPlan: req.body.focusPlan ?? existing?.focusPlan ?? '',
       endSummary: req.body.endSummary ?? existing?.endSummary ?? '',
       blockers: req.body.blockers ?? existing?.blockers ?? '',
       updatedAt: now
     });
-    if (typeof adapter.createActivityLog === 'function') await adapter.createActivityLog({ userId: req.currentUser.id, kind: 'check_in', label: 'Marcó entrada remota.', entityType: 'work_session', entityId: session.id, meta: { status: session.status } });
+    if (typeof adapter.createActivityLog === 'function') await adapter.createActivityLog({ userId: req.currentUser.id, kind: 'check_in', label: hasOpenSession ? 'Actualizó su entrada remota.' : 'Marcó entrada remota.', entityType: 'work_session', entityId: session.id, meta: { status: session.status } });
     res.json({ ok: true, session });
   } catch (error) {
     next(error);
@@ -2140,17 +2148,23 @@ app.post('/api/work/check-in', requireAuth, async (req, res, next) => {
 app.post('/api/work/check-out', requireAuth, async (req, res, next) => {
   try {
     const existing = await adapter.getWorkSessionForDate(req.currentUser.id, todayDateKey());
+    const now = nowIso();
+    const currentCheckIn = existing?.checkInAt || now;
+    const startedAt = new Date(currentCheckIn).getTime();
+    const endedAt = new Date(now).getTime();
+    const extraMinutes = existing?.checkInAt && !existing?.checkOutAt ? Math.max(0, Math.floor((endedAt - startedAt) / 60000)) : 0;
     const session = await adapter.saveWorkSession({
       ...(existing || {}),
       userId: req.currentUser.id,
       dateKey: todayDateKey(),
-      checkInAt: existing?.checkInAt || nowIso(),
-      checkOutAt: nowIso(),
+      checkInAt: currentCheckIn,
+      checkOutAt: now,
+      accruedMinutes: Math.max(0, Number(existing?.accruedMinutes || 0)) + extraMinutes,
       status: req.body.status || 'offline',
       focusPlan: req.body.focusPlan ?? existing?.focusPlan ?? '',
       endSummary: req.body.endSummary ?? existing?.endSummary ?? '',
       blockers: req.body.blockers ?? existing?.blockers ?? '',
-      updatedAt: nowIso()
+      updatedAt: now
     });
     if (typeof adapter.createActivityLog === 'function') await adapter.createActivityLog({ userId: req.currentUser.id, kind: 'check_out', label: 'Marcó salida remota.', entityType: 'work_session', entityId: session.id, meta: { status: session.status } });
     res.json({ ok: true, session });
