@@ -646,6 +646,35 @@ function createFileAdapter() {
       writeDb(db);
       return sanitizeUser(db.users[index]);
     },
+    async deleteUser(userId, { actingUserId = '' } = {}) {
+      const db = readDb();
+      const target = db.users.find((user) => user.id === userId);
+      if (!target) return { ok: false, code: 'NOT_FOUND' };
+      if (actingUserId && target.id === actingUserId) return { ok: false, code: 'CANNOT_DELETE_SELF' };
+      if (target.role === 'Admin' && db.users.filter((user) => user.role === 'Admin' && user.id !== userId).length === 0) return { ok: false, code: 'LAST_ADMIN' };
+      db.clients = db.clients.map((client) => client.ownerId === userId ? normalizeClient({ ...client, ownerId: '', updatedAt: nowIso() }) : client);
+      db.tasks = db.tasks.map((task) => {
+        const nextAssigneeIds = [...new Set(normalizeArray(task.assigneeIds || [task.assigneeId]).map((item) => String(item || '').trim()).filter(Boolean).filter((id) => id !== userId))];
+        return normalizeTask({
+          ...task,
+          assigneeId: task.assigneeId === userId ? '' : task.assigneeId,
+          assigneeIds: nextAssigneeIds,
+          createdById: task.createdById === userId ? '' : task.createdById,
+          subtasks: normalizeArray(task.subtasks).map((subtask) => subtask.assigneeId === userId ? { ...subtask, assigneeId: '' } : subtask),
+          comments: normalizeArray(task.comments).map((comment) => comment.authorId === userId ? { ...comment, authorId: '' } : comment),
+          updatedAt: nowIso()
+        });
+      });
+      db.attachments = normalizeArray(db.attachments).map((attachment) => attachment.uploadedById === userId ? normalizeAttachment({ ...attachment, uploadedById: '' }) : attachment);
+      db.sessions = normalizeArray(db.sessions).filter((session) => session.userId !== userId);
+      db.emailTokens = normalizeArray(db.emailTokens).filter((token) => token.userId !== userId);
+      db.workSessions = normalizeArray(db.workSessions).filter((session) => session.userId !== userId);
+      db.activityLogs = normalizeArray(db.activityLogs).filter((log) => log.userId !== userId);
+      db.reminderEvents = normalizeArray(db.reminderEvents).map((event) => event.userId === userId ? normalizeReminderEvent({ ...event, userId: '' }) : event);
+      db.users = db.users.filter((user) => user.id !== userId);
+      writeDb(db);
+      return { ok: true, user: sanitizeUser(target) };
+    },
     async createSession(userId) {
       const db = readDb();
       const rawToken = crypto.randomBytes(32).toString('hex');
@@ -1245,6 +1274,46 @@ function createPostgresAdapter() {
       const passwordHash = hashPassword(password);
       await query('UPDATE users SET password_hash=$2, status=$3, updated_at=$4 WHERE id=$1', [userId, passwordHash, 'active', nowIso()]);
       return this.getUserById(userId).then(sanitizeUser);
+    },
+    async deleteUser(userId, { actingUserId = '' } = {}) {
+      const target = await this.getUserById(userId);
+      if (!target) return { ok: false, code: 'NOT_FOUND' };
+      if (actingUserId && target.id === actingUserId) return { ok: false, code: 'CANNOT_DELETE_SELF' };
+      if (target.role === 'Admin') {
+        const adminsRes = await query(`SELECT COUNT(*)::int AS count FROM users WHERE role = 'Admin' AND id <> $1`, [userId]);
+        if (adminsRes.rows[0].count === 0) return { ok: false, code: 'LAST_ADMIN' };
+      }
+      await query('UPDATE clients SET owner_id = NULL, updated_at = $2 WHERE owner_id = $1', [userId, nowIso()]);
+      await query('UPDATE attachments SET uploaded_by_id = NULL WHERE uploaded_by_id = $1', [userId]);
+      const tasksRes = await query('SELECT * FROM tasks ORDER BY created_at DESC');
+      for (const row of tasksRes.rows) {
+        const task = mapTaskRow(row);
+        const assigneeIds = [...new Set(normalizeArray(task.assigneeIds || [task.assigneeId]).map((item) => String(item || '').trim()).filter(Boolean))];
+        const nextAssigneeIds = assigneeIds.filter((id) => id !== userId);
+        const nextTask = normalizeTask({
+          ...task,
+          assigneeId: task.assigneeId === userId ? '' : task.assigneeId,
+          assigneeIds: nextAssigneeIds,
+          createdById: task.createdById === userId ? '' : task.createdById,
+          subtasks: normalizeArray(task.subtasks).map((subtask) => subtask.assigneeId === userId ? { ...subtask, assigneeId: '' } : subtask),
+          comments: normalizeArray(task.comments).map((comment) => comment.authorId === userId ? { ...comment, authorId: '' } : comment),
+          updatedAt: nowIso()
+        });
+        const changed = JSON.stringify(task.assigneeIds || []) !== JSON.stringify(nextTask.assigneeIds || []) || task.assigneeId !== nextTask.assigneeId || task.createdById !== nextTask.createdById || JSON.stringify(task.subtasks || []) !== JSON.stringify(nextTask.subtasks || []) || JSON.stringify(task.comments || []) !== JSON.stringify(nextTask.comments || []);
+        if (changed) {
+          await query(
+            `UPDATE tasks SET assignee_id=$2, assignee_ids=$3::jsonb, subtasks=$4::jsonb, comments=$5::jsonb, created_by_id=$6, updated_at=$7 WHERE id=$1`,
+            [nextTask.id, nextTask.assigneeId || null, JSON.stringify(nextTask.assigneeIds || []), JSON.stringify(nextTask.subtasks || []), JSON.stringify(nextTask.comments || []), nextTask.createdById || null, nextTask.updatedAt]
+          );
+        }
+      }
+      await query('DELETE FROM sessions WHERE user_id = $1', [userId]);
+      await query('DELETE FROM email_tokens WHERE user_id = $1', [userId]);
+      await query('DELETE FROM work_sessions WHERE user_id = $1', [userId]);
+      await query('DELETE FROM activity_logs WHERE user_id = $1', [userId]);
+      await query('UPDATE reminder_events SET user_id = NULL WHERE user_id = $1', [userId]);
+      const res = await query('DELETE FROM users WHERE id = $1', [userId]);
+      return res.rowCount ? { ok: true, user: sanitizeUser(target) } : { ok: false, code: 'NOT_FOUND' };
     },
     async createSession(userId) {
       const rawToken = crypto.randomBytes(32).toString('hex');
@@ -2360,6 +2429,30 @@ app.post('/api/admin/users/:id/password-reset', requireAuth, requireAdmin, async
     }
     const delivery = await sendResetEmail(user);
     res.json({ ok: true, previewLink: delivery.mode === 'log' ? delivery.link : '', deliveryMode: delivery.mode });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.delete('/api/admin/users/:id', requireAuth, requireAdmin, async (req, res, next) => {
+  try {
+    const result = await adapter.deleteUser(req.params.id, { actingUserId: req.currentUser.id });
+    if (!result?.ok) {
+      if (result?.code === 'NOT_FOUND') return res.status(404).json({ error: 'Usuario no encontrado.' });
+      if (result?.code === 'CANNOT_DELETE_SELF') return res.status(400).json({ error: 'No puedes eliminar tu propio usuario.' });
+      if (result?.code === 'LAST_ADMIN') return res.status(400).json({ error: 'Debe quedar al menos un usuario admin activo.' });
+      return res.status(400).json({ error: 'No se pudo eliminar el usuario.' });
+    }
+    if (typeof adapter.createActivityLog === 'function') {
+      await adapter.createActivityLog({
+        userId: req.currentUser.id,
+        kind: 'user_delete',
+        label: `Eliminó al usuario "${result.user?.name || req.params.id}".`,
+        entityType: 'user',
+        entityId: req.params.id
+      });
+    }
+    res.json({ ok: true, user: result.user || null });
   } catch (error) {
     next(error);
   }
