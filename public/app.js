@@ -164,6 +164,58 @@ function statusClass(key) {
   return `status-${key}`;
 }
 
+function isAdmin() {
+  return state.currentUser?.role === 'Admin';
+}
+
+function normalizeUrl(value) {
+  const raw = String(value || '').trim();
+  if (!raw) return '';
+  const withProtocol = /^https?:\/\//i.test(raw) ? raw : `https://${raw}`;
+  try {
+    return new URL(withProtocol).toString();
+  } catch (_error) {
+    return '';
+  }
+}
+
+function getLinkProvider(url) {
+  try {
+    const host = new URL(url).hostname.toLowerCase();
+    if (host.includes('canva.com')) return 'Canva';
+    if (host.includes('drive.google.com') || host.includes('docs.google.com')) return 'Drive';
+    if (host.includes('figma.com')) return 'Figma';
+    if (host.includes('notion.so')) return 'Notion';
+    if (host.includes('dropbox.com')) return 'Dropbox';
+    if (host.includes('onedrive.live.com') || host.includes('sharepoint.com')) return 'OneDrive';
+    return 'Link';
+  } catch (_error) {
+    return 'Link';
+  }
+}
+
+function getTaskResourceLinks(task) {
+  return Array.isArray(task?.resourceLinks) ? task.resourceLinks : [];
+}
+
+function parseResourceLinks(text, existingLinks = []) {
+  const existingByUrl = new Map((Array.isArray(existingLinks) ? existingLinks : []).map((item) => [String(item.url || '').trim(), item]));
+  return String(text || '')
+    .split(/\n+/)
+    .map((line) => normalizeUrl(line))
+    .filter(Boolean)
+    .filter((url, index, list) => list.indexOf(url) === index)
+    .map((url) => {
+      const existing = existingByUrl.get(url) || {};
+      return {
+        id: existing.id || `rl_${Math.random().toString(36).slice(2, 10)}` ,
+        url,
+        provider: existing.provider || getLinkProvider(url),
+        label: existing.label || getLinkProvider(url)
+      };
+    });
+}
+
 function uniqueIds(values = []) {
   return [...new Set((Array.isArray(values) ? values : []).map((item) => String(item || '').trim()).filter(Boolean))];
 }
@@ -441,8 +493,10 @@ function updateTopbar() {
   const showToolbar = ['tasks', 'dashboard', 'calendar'].includes(state.tab);
   els.toolbarSection.classList.toggle('hidden', !showToolbar);
   els.taskViewToggle.classList.toggle('hidden', state.tab !== 'tasks');
-  els.newUserButton.classList.toggle('hidden', state.currentUser?.role !== 'Admin');
-  els.adminNavButton.classList.toggle('hidden', state.currentUser?.role !== 'Admin');
+  els.newUserButton.classList.toggle('hidden', !isAdmin());
+  els.adminNavButton.classList.toggle('hidden', !isAdmin());
+  els.newClientButton.classList.toggle('hidden', !isAdmin());
+  els.newTaskButton.classList.toggle('hidden', !isAdmin());
 }
 
 function renderSidebarQuickStats() {
@@ -490,7 +544,29 @@ function renderDashboard() {
     key: status.key,
     count: filtered.filter((task) => task.status === status.key).length
   }));
-  const tasksWithAttachments = filtered.filter((task) => (task.attachments || []).length).length;
+  const tasksWithLinks = filtered.filter((task) => getTaskResourceLinks(task).length).length;
+  const teamLoadSection = isAdmin() ? `
+      <section class="panel">
+        <div class="panel-header">
+          <div>
+            <p class="eyebrow">Carga</p>
+            <h3 class="panel-title">Carga del equipo</h3>
+          </div>
+        </div>
+        <div class="stack-form">
+          ${workload.map(({ user, total }) => `
+            <div class="user-row">
+              <div class="client-card-header">
+                <strong>${escapeHtml(user.name)}</strong>
+                <span class="badge">${total} activas</span>
+              </div>
+              <div class="small-text">${escapeHtml(user.role)}</div>
+              <div class="progress-bar"><span style="width:${Math.min(total * 18, 100)}%"></span></div>
+            </div>
+          `).join('')}
+        </div>
+      </section>
+  ` : '';
 
   els.workspace.innerHTML = `
     <div class="stats-grid">
@@ -503,8 +579,8 @@ function renderDashboard() {
         <div class="stat-value">${state.clients.length}</div>
       </article>
       <article class="stat-card">
-        <p class="small-text">Con adjuntos</p>
-        <div class="stat-value">${tasksWithAttachments}</div>
+        <p class="small-text">Con enlaces</p>
+        <div class="stat-value">${tasksWithLinks}</div>
       </article>
       <article class="stat-card">
         <p class="small-text">Equipo</p>
@@ -534,26 +610,7 @@ function renderDashboard() {
           `).join('') : `<div class="empty-state">No hay entregas con esos filtros.</div>`}
         </div>
       </section>
-      <section class="panel">
-        <div class="panel-header">
-          <div>
-            <p class="eyebrow">Carga</p>
-            <h3 class="panel-title">Carga del equipo</h3>
-          </div>
-        </div>
-        <div class="stack-form">
-          ${workload.map(({ user, total }) => `
-            <div class="user-row">
-              <div class="client-card-header">
-                <strong>${escapeHtml(user.name)}</strong>
-                <span class="badge">${total} activas</span>
-              </div>
-              <div class="small-text">${escapeHtml(user.role)}</div>
-              <div class="progress-bar"><span style="width:${Math.min(total * 18, 100)}%"></span></div>
-            </div>
-          `).join('')}
-        </div>
-      </section>
+      ${teamLoadSection}
       <section class="panel">
         <div class="panel-header">
           <div>
@@ -652,7 +709,7 @@ function renderTaskCard(task) {
         ${task.approvalRequired ? '<span class="task-chip">Aprobación</span>' : ''}
         ${checklistTotal ? `<span class="task-chip">Checklist ${checklistDone}/${checklistTotal}</span>` : ''}
         ${subtaskSummary.total ? `<span class="task-chip">Subtareas ${subtaskSummary.completed}/${subtaskSummary.total}</span>` : ''}
-        ${(task.attachments || []).length ? `<span class="task-chip">Adjuntos ${(task.attachments || []).length}</span>` : ''}
+        ${getTaskResourceLinks(task).length ? `<span class="task-chip">Enlaces ${getTaskResourceLinks(task).length}</span>` : ''}
       </div>
       ${renderSubtaskPreview(task)}
       ${(task.labels || []).length ? `<div class="tags-row">${task.labels.map((label) => `<span class="badge">#${escapeHtml(label)}</span>`).join('')}</div>` : ''}
@@ -681,7 +738,7 @@ function renderTaskTableHtml(tasks) {
             <th>Subtareas</th>
             <th>Estado</th>
             <th>Entrega</th>
-            <th>Adjuntos</th>
+            <th>Enlaces</th>
             <th>Acciones</th>
           </tr>
         </thead>
@@ -699,7 +756,7 @@ function renderTaskTableHtml(tasks) {
               <td data-label="Subtareas">${subtaskSummary.total ? `${subtaskSummary.completed}/${subtaskSummary.total}` : '—'}</td>
               <td data-label="Estado"><select class="inline-status-select ${statusClass(task.status)}" data-task-status-select="${task.id}">${renderStatusOptions(task.status)}</select></td>
               <td data-label="Entrega">${escapeHtml(formatDate(getTaskDueReference(task) || task.dueDate))}</td>
-              <td data-label="Adjuntos">${(task.attachments || []).length}</td>
+              <td data-label="Enlaces">${getTaskResourceLinks(task).length}</td>
               <td data-label="Acciones">
                 <div class="table-actions">
                   <button class="text-button" data-edit-task="${task.id}">Editar</button>
@@ -790,9 +847,9 @@ function renderClients() {
               ${(client.channels || []).map((channel) => `<span class="channel-pill">${escapeHtml(channel)}</span>`).join('')}
             </div>
             <p class="small-text">${escapeHtml(client.notes || 'Sin notas')}</p>
-            <div class="table-actions">
+            ${isAdmin() ? `<div class="table-actions">
               <button class="text-button" data-edit-client="${client.id}">Editar</button>
-            </div>
+            </div>` : ''}
           </article>
         `;
       }).join('')}
@@ -1243,25 +1300,29 @@ function openTaskModal(taskId = '') {
   document.getElementById('taskPublishDate').value = task?.publishDate || '';
   document.getElementById('taskApproval').checked = Boolean(task?.approvalRequired);
   document.getElementById('taskLabels').value = (task?.labels || []).join(', ');
+  if (!task && !isAdmin()) {
+    showToast('Acceso restringido', 'Solo el admin puede crear tareas.', 'error');
+    return;
+  }
   document.getElementById('taskChecklist').value = (task?.checklist || []).map((item) => item.text).join('\n');
   document.getElementById('taskComment').value = '';
-  document.getElementById('taskFiles').value = '';
+  document.getElementById('taskLinks').value = getTaskResourceLinks(task).map((item) => item.url).join('\n');
   renderTaskSubtasksEditor(task || null);
-  renderTaskAttachments(task);
+  renderTaskResourceLinks(task);
   els.taskModalBackdrop.classList.remove('hidden');
 }
 
-function renderTaskAttachments(task) {
-  const container = document.getElementById('taskAttachmentList');
-  if (!task || !(task.attachments || []).length) {
-    container.innerHTML = `<div class="empty-state">Guarda la tarea y luego agrega adjuntos, o súbelos ahora si ya estás editando.</div>`;
+function renderTaskResourceLinks(task) {
+  const container = document.getElementById('taskResourceLinkList');
+  const links = getTaskResourceLinks(task);
+  if (!links.length) {
+    container.innerHTML = `<div class="empty-state">Agrega enlaces de Drive, Canva, Figma o Docs para compartir referencias y entregables.</div>`;
     return;
   }
-  container.innerHTML = task.attachments.map((attachment) => `
+  container.innerHTML = links.map((link) => `
     <div class="attachment-item">
-      <a class="link-button" href="/api/attachments/${attachment.id}/download" target="_blank">${escapeHtml(attachment.originalName)}</a>
-      <span class="small-text">${Math.round((attachment.sizeBytes || 0) / 1024)} KB</span>
-      <button class="text-button" type="button" data-delete-attachment="${attachment.id}">Quitar</button>
+      <a class="link-button" href="${escapeHtml(link.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(link.provider || 'Link')}</a>
+      <span class="small-text resource-url">${escapeHtml(link.url)}</span>
     </div>
   `).join('');
 }
@@ -1272,6 +1333,10 @@ function closeTaskModal() {
 }
 
 function openClientModal(clientId = '') {
+  if (!isAdmin()) {
+    showToast('Acceso restringido', 'Solo el admin puede gestionar clientes.', 'error');
+    return;
+  }
   const client = state.clients.find((item) => item.id === clientId);
   els.clientModalTitle.textContent = client ? 'Editar cliente' : 'Nuevo cliente';
   els.deleteClientButton.classList.toggle('hidden', !client);
@@ -1330,6 +1395,7 @@ async function saveTaskFromForm() {
     approvalRequired: document.getElementById('taskApproval').checked,
     labels: document.getElementById('taskLabels').value.split(',').map((item) => item.trim()).filter(Boolean),
     checklist: parseLinesToChecklist(document.getElementById('taskChecklist').value, original?.checklist || []),
+    resourceLinks: parseResourceLinks(document.getElementById('taskLinks').value, original?.resourceLinks || []),
     subtasks: collectSubtasksFromForm(original?.subtasks || []),
     comments: [
       ...(original?.comments || []),
@@ -1351,16 +1417,6 @@ async function saveTaskFromForm() {
     body: JSON.stringify(payload)
   });
 
-  const files = [...document.getElementById('taskFiles').files];
-  for (const file of files) {
-    const formData = new FormData();
-    formData.append('file', file);
-    const attachment = await api(`/api/tasks/${savedTask.id}/attachments`, {
-      method: 'POST',
-      body: formData
-    });
-    savedTask.attachments = [...(savedTask.attachments || []), attachment];
-  }
 
   if (taskId) {
     state.tasks = state.tasks.map((task) => task.id === savedTask.id ? savedTask : task);
@@ -1371,6 +1427,9 @@ async function saveTaskFromForm() {
 }
 
 async function saveClientFromForm() {
+  if (!isAdmin()) {
+    throw new Error('Solo el admin puede gestionar clientes.');
+  }
   const clientId = document.getElementById('clientIdField').value;
   const payload = {
     id: clientId || undefined,
@@ -1546,7 +1605,7 @@ function bindDynamicActions() {
   if (runRemindersButton) {
     runRemindersButton.addEventListener('click', async () => {
       try {
-        const result = await api('/api/admin/run-reminders', { method: 'POST' });
+        const result = await api('/api/admin/reminders/run', { method: 'POST' });
         showToast('Recordatorios ejecutados', `Enviados: ${result.sent || 0} · Saltados: ${result.skipped || 0}`);
         await refreshBootstrap();
       } catch (error) {
@@ -1554,18 +1613,6 @@ function bindDynamicActions() {
       }
     });
   }
-  document.querySelectorAll('[data-delete-attachment]').forEach((button) => {
-    button.addEventListener('click', async () => {
-      try {
-        await api(`/api/attachments/${button.dataset.deleteAttachment}`, { method: 'DELETE' });
-        await refreshBootstrap();
-        const taskId = document.getElementById('taskId').value;
-        if (taskId) openTaskModal(taskId);
-      } catch (error) {
-        showToast('Error', error.message, 'error');
-      }
-    });
-  });
 }
 
 async function refreshBootstrap() {
@@ -1748,6 +1795,9 @@ function bindStaticEvents() {
 
   els.newTaskButton.addEventListener('click', () => openTaskModal());
   document.getElementById('addSubtaskButton').addEventListener('click', () => addSubtaskRow());
+  document.getElementById('taskLinks').addEventListener('input', (event) => {
+    renderTaskResourceLinks({ resourceLinks: parseResourceLinks(event.target.value) });
+  });
   els.newClientButton.addEventListener('click', () => openClientModal());
   els.newUserButton.addEventListener('click', () => openUserModal());
   els.logoutButton.addEventListener('click', async () => {

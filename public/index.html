@@ -237,14 +237,18 @@
           <div class="panel inner-panel">
             <div class="panel-header compact-head">
               <div>
-                <h4 class="panel-title no-margin">Adjuntos</h4>
-                <p class="small-text">Sube propuestas, briefs, artes, PDFs o videos cortos.</p>
+                <h4 class="panel-title no-margin">Enlaces de recursos</h4>
+                <p class="small-text">Pega enlaces de Drive, Canva, Figma, Notion o Docs. Un enlace por línea.</p>
               </div>
             </div>
-            <div class="attachment-upload-row">
-              <input id="taskFiles" type="file" multiple />
-            </div>
-            <div class="attachment-list" id="taskAttachmentList"></div>
+            <label class="field full-row no-gap">
+              <span>Links de referencia o entrega</span>
+              <textarea id="taskLinks" rows="4" placeholder="https://www.canva.com/...
+https://drive.google.com/...
+https://figma.com/...
+https://docs.google.com/..."></textarea>
+            </label>
+            <div class="attachment-list" id="taskResourceLinkList"></div>
           </div>
 
           <div class="modal-footer">

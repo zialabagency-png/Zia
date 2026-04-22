@@ -1878,3 +1878,91 @@ code {
     background: linear-gradient(180deg, #000000, #010101 58%, #000000);
   }
 }
+
+
+/* 2026-04 visual + permissions pass */
+.main-content,
+.sidebar,
+.modal-card,
+.panel,
+.stat-card,
+.client-card,
+.remote-user-card,
+.user-row,
+.list-card,
+.task-card,
+.board-column,
+.calendar-day,
+.email-log-card,
+.inner-panel,
+.auth-card {
+  background: linear-gradient(180deg, rgba(2, 2, 2, 0.985), rgba(4, 4, 4, 0.975));
+}
+
+.main-content {
+  background-color: #000000;
+}
+
+.table-wrap,
+.clients-grid,
+.dashboard-grid,
+.profile-grid,
+.admin-grid {
+  background: transparent;
+}
+
+.no-gap {
+  gap: 10px;
+}
+
+.resource-url {
+  overflow-wrap: anywhere;
+}
+
+.topbar,
+.toolbar {
+  background: transparent;
+}
+
+.progress-bar {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.progress-bar span {
+  background: linear-gradient(90deg, rgba(255,107,0,0.92), rgba(255,107,0,0.42));
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  outline: none;
+  border-color: rgba(255, 107, 0, 0.46);
+  box-shadow: 0 0 0 3px rgba(255, 107, 0, 0.08);
+}
+
+
+body,
+.app-shell,
+.auth-shell {
+  background-color: #000000;
+}
+
+.main-content,
+.sidebar,
+.panel,
+.client-card,
+.stat-card,
+.remote-user-card,
+.user-row,
+.modal-card,
+.task-card,
+.board-column,
+.calendar-day,
+.email-log-card,
+.inner-panel,
+.brand-block,
+.sidebar-panel {
+  box-shadow: 0 20px 48px rgba(0, 0, 0, 0.42);
+  background-image: none;
+  background-color: rgba(3, 3, 3, 0.985);
+}
