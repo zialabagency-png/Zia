@@ -48,7 +48,8 @@ const state = {
   dragTaskId: '',
   authMode: 'login',
   tokenMode: '',
-  tokenValue: ''
+  tokenValue: '',
+  liveWorkSessionIds: {}
 };
 
 const els = {
@@ -290,6 +291,26 @@ function todayKey() {
   return zonedTodayKey();
 }
 
+function sessionDateKeys(session) {
+  const keys = new Set();
+  if (session?.dateKey) keys.add(String(session.dateKey));
+  ['checkInAt', 'checkOutAt', 'updatedAt', 'createdAt'].forEach((field) => {
+    const value = session?.[field];
+    if (!value) return;
+    try {
+      keys.add(zonedTodayKey(new Date(value)));
+    } catch (_error) {}
+  });
+  return [...keys].filter(Boolean);
+}
+
+function sessionSortScore(session) {
+  const openBoost = session?.checkInAt && !session?.checkOutAt ? 3 : 0;
+  const todayBoost = sessionDateKeys(session).includes(todayKey()) ? 2 : 0;
+  const updatedAt = new Date(session?.updatedAt || session?.checkInAt || session?.createdAt || 0).getTime() || 0;
+  return (openBoost * 1e15) + (todayBoost * 1e14) + updatedAt;
+}
+
 function workStatusLabel(key) {
   return WORK_STATUS_CONFIG.find((item) => item.key === key)?.label || 'Disponible';
 }
@@ -299,7 +320,24 @@ function workStatusClass(key) {
 }
 
 function getTodaySession(userId) {
-  return (state.workSessions || []).find((session) => session.userId === userId && session.dateKey === todayKey()) || null;
+  const sessions = (state.workSessions || []).filter((session) => session.userId === userId);
+  if (!sessions.length) return null;
+
+  const pinnedId = state.liveWorkSessionIds?.[userId];
+  const pinned = pinnedId ? sessions.find((session) => session.id === pinnedId) : null;
+  if (pinned) return pinned;
+
+  const sameDaySessions = sessions.filter((session) => sessionDateKeys(session).includes(todayKey()));
+  if (sameDaySessions.length) {
+    return sameDaySessions.sort((a, b) => sessionSortScore(b) - sessionSortScore(a))[0];
+  }
+
+  const activeSession = sessions
+    .filter((session) => session.checkInAt && !session.checkOutAt)
+    .sort((a, b) => sessionSortScore(b) - sessionSortScore(a))[0];
+  if (activeSession) return activeSession;
+
+  return sessions.sort((a, b) => sessionSortScore(b) - sessionSortScore(a))[0] || null;
 }
 
 function getUserActivityLogs(userId, limit = 8) {
@@ -1314,6 +1352,11 @@ function syncWorkStatusVisuals() {
   select.classList.add('work-status-select', workStatusClass(select.value || 'available'));
 }
 
+function pinLiveWorkSession(session) {
+  if (!session?.userId || !session?.id) return;
+  state.liveWorkSessionIds[session.userId] = session.id;
+}
+
 function bindWorkSessionControls() {
   const workSessionForm = document.getElementById('workSessionForm');
   const checkInButton = document.getElementById('checkInButton');
@@ -1340,6 +1383,7 @@ function bindWorkSessionControls() {
       });
       const index = state.workSessions.findIndex((item) => item.id === result.session.id || (item.userId === result.session.userId && item.dateKey === result.session.dateKey));
       if (index >= 0) state.workSessions[index] = result.session; else state.workSessions.unshift(result.session);
+      pinLiveWorkSession(result.session);
       updateWorkSessionPanelVisuals();
       startWorkSessionTicker();
       showToast('Jornada guardada', 'Se actualizó tu control remoto del día.');
@@ -1364,6 +1408,7 @@ function bindWorkSessionControls() {
       });
       const index = state.workSessions.findIndex((item) => item.id === result.session.id || (item.userId === result.session.userId && item.dateKey === result.session.dateKey));
       if (index >= 0) state.workSessions[index] = result.session; else state.workSessions.unshift(result.session);
+      pinLiveWorkSession(result.session);
       updateWorkSessionPanelVisuals();
       startWorkSessionTicker();
       showToast('Entrada registrada', 'Tu jornada remota ya inició.');
@@ -1387,6 +1432,7 @@ function bindWorkSessionControls() {
       });
       const index = state.workSessions.findIndex((item) => item.id === result.session.id || (item.userId === result.session.userId && item.dateKey === result.session.dateKey));
       if (index >= 0) state.workSessions[index] = result.session; else state.workSessions.unshift(result.session);
+      pinLiveWorkSession(result.session);
       updateWorkSessionPanelVisuals();
       startWorkSessionTicker();
       showToast('Salida registrada', 'Tu jornada quedó cerrada.');
