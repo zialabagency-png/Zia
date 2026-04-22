@@ -1717,12 +1717,20 @@ function openSidebar() {
   if (!els.appShell) return;
   els.appShell.classList.add('sidebar-open');
   els.sidebarScrim?.classList.remove('hidden');
+  document.body.classList.add('drawer-open');
 }
 
 function closeSidebar() {
   if (!els.appShell) return;
   els.appShell.classList.remove('sidebar-open');
   els.sidebarScrim?.classList.add('hidden');
+  document.body.classList.remove('drawer-open');
+}
+
+function scrollCurrentViewToTop() {
+  try { window.scrollTo({ top: 0, left: 0, behavior: 'auto' }); } catch (_error) {}
+  try { document.querySelector('.main-content')?.scrollTo({ top: 0, left: 0, behavior: 'auto' }); } catch (_error) {}
+  try { els.workspace?.scrollIntoView({ block: 'start', behavior: 'auto' }); } catch (_error) {}
 }
 
 function activateAuthView(view) {
@@ -1769,6 +1777,9 @@ function bindStaticEvents() {
   els.mobileMenuButton?.addEventListener('click', openSidebar);
   els.sidebarCloseButton?.addEventListener('click', closeSidebar);
   els.sidebarScrim?.addEventListener('click', closeSidebar);
+  window.addEventListener('resize', () => {
+    if (window.innerWidth > 980) closeSidebar();
+  });
 
   els.loginView.addEventListener('submit', async (event) => {
     event.preventDefault();
@@ -1835,6 +1846,7 @@ function bindStaticEvents() {
     closeSidebar();
     render();
     bindDynamicActions();
+    scrollCurrentViewToTop();
   });
 
   els.newTaskButton.addEventListener('click', () => openTaskModal());
