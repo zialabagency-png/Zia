@@ -133,6 +133,23 @@ function isoDate(date) {
   return new Date(date).toISOString().slice(0, 10);
 }
 
+function zonedTodayKey() {
+  const timeZone = state.notificationSettings?.timezone || 'America/Santo_Domingo';
+  try {
+    const parts = new Intl.DateTimeFormat('en-CA', {
+      timeZone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    }).formatToParts(new Date());
+    const year = parts.find((item) => item.type === 'year')?.value;
+    const month = parts.find((item) => item.type === 'month')?.value;
+    const day = parts.find((item) => item.type === 'day')?.value;
+    if (year && month && day) return `${year}-${month}-${day}`;
+  } catch (_error) {}
+  return isoDate(new Date());
+}
+
 function startOfMonth(date) {
   return new Date(date.getFullYear(), date.getMonth(), 1);
 }
@@ -270,7 +287,7 @@ function getSubtaskSummary(task) {
 }
 
 function todayKey() {
-  return isoDate(new Date());
+  return zonedTodayKey();
 }
 
 function workStatusLabel(key) {
@@ -348,15 +365,15 @@ function renderWorkSessionPanel({ context = 'profile' } = {}) {
         </div>
         <div class="table-actions wrap-actions remote-actions">
           <span class="badge stage-badge ${workStatusClass(statusKey)}">${escapeHtml(workStatusLabel(statusKey))}</span>
-          <button class="ghost-button" type="button" id="checkInButton" ${session?.checkInAt ? 'disabled' : ''}>Marcar entrada</button>
-          <button class="ghost-button" type="button" id="checkOutButton" ${session?.checkOutAt ? 'disabled' : ''}>Marcar salida</button>
+          <button class="ghost-button" type="button" id="checkInButton" data-work-checkin ${session?.checkInAt ? 'disabled' : ''}>Marcar entrada</button>
+          <button class="ghost-button" type="button" id="checkOutButton" data-work-checkout ${session?.checkOutAt ? 'disabled' : ''}>Marcar salida</button>
         </div>
       </div>
       <div class="stats-grid work-session-stats ${isDashboard ? 'dashboard-work-stats' : 'profile-work-stats'}">
-        <article class="stat-card stat-card-wide work-stat-card work-time-card"><p class="small-text">Entrada</p><div class="stat-value small-value">${escapeHtml(formatDateTime(session?.checkInAt))}</div></article>
-        <article class="stat-card stat-card-wide work-stat-card work-time-card"><p class="small-text">Salida</p><div class="stat-value small-value">${escapeHtml(formatDateTime(session?.checkOutAt))}</div></article>
-        <article class="stat-card work-stat-card work-duration-card"><p class="small-text">Tiempo</p><div class="stat-value small-value">${escapeHtml(getSessionWorkedLabel(session))}</div></article>
-        <article class="stat-card work-stat-card work-status-card ${workStatusClass(statusKey)}"><p class="small-text">Estado</p><div class="stat-value small-value">${escapeHtml(workStatusLabel(statusKey))}</div></article>
+        <article class="stat-card stat-card-wide work-stat-card work-time-card"><p class="small-text">Entrada</p><div class="stat-value small-value" data-work-checkin-value>${escapeHtml(formatDateTime(session?.checkInAt))}</div></article>
+        <article class="stat-card stat-card-wide work-stat-card work-time-card"><p class="small-text">Salida</p><div class="stat-value small-value" data-work-checkout-value>${escapeHtml(formatDateTime(session?.checkOutAt))}</div></article>
+        <article class="stat-card work-stat-card work-duration-card"><p class="small-text">Tiempo</p><div class="stat-value small-value" data-work-duration>${escapeHtml(getSessionWorkedLabel(session))}</div></article>
+        <article class="stat-card work-stat-card work-status-card ${workStatusClass(statusKey)}" data-work-status-card><p class="small-text">Estado</p><div class="stat-value small-value" data-work-status-label>${escapeHtml(workStatusLabel(statusKey))}</div></article>
       </div>
       <form class="stack-form work-session-form ${isDashboard ? 'work-session-form-inline' : ''}" id="workSessionForm">
         <label class="field work-field-status">
@@ -1241,6 +1258,54 @@ function renderProfile() {
   bindWorkSessionControls();
 }
 
+let workSessionTicker = null;
+
+function updateWorkSessionPanelVisuals() {
+  const session = getTodaySession(state.currentUser?.id);
+  const statusKey = session?.status || 'offline';
+  const durationNodes = document.querySelectorAll('[data-work-duration]');
+  durationNodes.forEach((node) => {
+    node.textContent = getSessionWorkedLabel(session);
+  });
+  document.querySelectorAll('[data-work-checkin-value]').forEach((node) => {
+    node.textContent = formatDateTime(session?.checkInAt);
+  });
+  document.querySelectorAll('[data-work-checkout-value]').forEach((node) => {
+    node.textContent = formatDateTime(session?.checkOutAt);
+  });
+  document.querySelectorAll('[data-work-status-label]').forEach((node) => {
+    node.textContent = workStatusLabel(statusKey);
+  });
+  const statusClasses = WORK_STATUS_CONFIG.map((item) => workStatusClass(item.key));
+  document.querySelectorAll('[data-work-status-card]').forEach((node) => {
+    node.classList.remove(...statusClasses);
+    node.classList.add(workStatusClass(statusKey));
+  });
+  const checkInButton = document.getElementById('checkInButton');
+  const checkOutButton = document.getElementById('checkOutButton');
+  if (checkInButton) checkInButton.disabled = Boolean(session?.checkInAt && !session?.checkOutAt);
+  if (checkOutButton) checkOutButton.disabled = !Boolean(session?.checkInAt) || Boolean(session?.checkOutAt);
+  const workStatusSelect = document.getElementById('workStatus');
+  if (workStatusSelect && !document.activeElement?.isSameNode(workStatusSelect)) {
+    workStatusSelect.value = statusKey;
+    syncWorkStatusVisuals();
+  }
+}
+
+function startWorkSessionTicker() {
+  if (workSessionTicker) window.clearInterval(workSessionTicker);
+  if (!document.querySelector('[data-work-duration]')) return;
+  updateWorkSessionPanelVisuals();
+  workSessionTicker = window.setInterval(() => {
+    if (!document.querySelector('[data-work-duration]')) {
+      window.clearInterval(workSessionTicker);
+      workSessionTicker = null;
+      return;
+    }
+    updateWorkSessionPanelVisuals();
+  }, 1000);
+}
+
 function syncWorkStatusVisuals() {
   const select = document.getElementById('workStatus');
   if (!select) return;
@@ -1256,7 +1321,8 @@ function bindWorkSessionControls() {
   const workStatusSelect = document.getElementById('workStatus');
   if (!workSessionForm || !checkInButton || !checkOutButton) return;
 
-  syncWorkStatusVisuals();
+  updateWorkSessionPanelVisuals();
+  startWorkSessionTicker();
   workStatusSelect?.addEventListener('change', syncWorkStatusVisuals);
 
   workSessionForm.addEventListener('submit', async (event) => {
@@ -1274,6 +1340,8 @@ function bindWorkSessionControls() {
       });
       const index = state.workSessions.findIndex((item) => item.id === result.session.id || (item.userId === result.session.userId && item.dateKey === result.session.dateKey));
       if (index >= 0) state.workSessions[index] = result.session; else state.workSessions.unshift(result.session);
+      updateWorkSessionPanelVisuals();
+      startWorkSessionTicker();
       showToast('Jornada guardada', 'Se actualizó tu control remoto del día.');
       await refreshBootstrap();
       render();
@@ -1296,6 +1364,8 @@ function bindWorkSessionControls() {
       });
       const index = state.workSessions.findIndex((item) => item.id === result.session.id || (item.userId === result.session.userId && item.dateKey === result.session.dateKey));
       if (index >= 0) state.workSessions[index] = result.session; else state.workSessions.unshift(result.session);
+      updateWorkSessionPanelVisuals();
+      startWorkSessionTicker();
       showToast('Entrada registrada', 'Tu jornada remota ya inició.');
       await refreshBootstrap();
       render();
@@ -1317,6 +1387,8 @@ function bindWorkSessionControls() {
       });
       const index = state.workSessions.findIndex((item) => item.id === result.session.id || (item.userId === result.session.userId && item.dateKey === result.session.dateKey));
       if (index >= 0) state.workSessions[index] = result.session; else state.workSessions.unshift(result.session);
+      updateWorkSessionPanelVisuals();
+      startWorkSessionTicker();
       showToast('Salida registrada', 'Tu jornada quedó cerrada.');
       await refreshBootstrap();
       render();
