@@ -13,8 +13,8 @@
       "status": "active",
       "passwordHash": "277555513ae80b3ade2e1fb72c0c8aa2$fc73eb19d7247b1b5447799ebe594b51943c28543a12512930e62d926bca842b88fc79a54c622046e3b7efe651cee20bc4c36701803a5329e707db29b0d2f176",
       "createdAt": "2026-04-20T02:50:42.726Z",
-      "updatedAt": "2026-04-21T05:10:11.058Z",
-      "lastLoginAt": "2026-04-21T05:10:10.948Z"
+      "updatedAt": "2026-04-22T01:26:39.797Z",
+      "lastLoginAt": "2026-04-22T01:26:39.663Z"
     },
     {
       "id": "u2",
@@ -25,8 +25,8 @@
       "status": "active",
       "passwordHash": "80762f8b6defb98d00f43b0410540780$cc7fef71e07f020797e29950ab685f5588feb91922fa4813fcea028c9614d0eb1ae7ba36874bba35cf65f957cd5b6ab3ab08e6674c2f8e5c012b95267fbd9afa",
       "createdAt": "2026-04-20T02:50:42.849Z",
-      "updatedAt": "2026-04-20T02:52:43.636Z",
-      "lastLoginAt": ""
+      "updatedAt": "2026-04-22T01:29:04.394Z",
+      "lastLoginAt": "2026-04-22T01:29:04.259Z"
     },
     {
       "id": "u3",
@@ -156,6 +156,7 @@
       "labels": [
         "calendario"
       ],
+      "resourceLinks": [],
       "checklist": [
         {
           "id": "cl_66d7fd7a08c3",
@@ -211,6 +212,7 @@
         "venta",
         "video"
       ],
+      "resourceLinks": [],
       "checklist": [
         {
           "id": "cl1",
@@ -262,6 +264,7 @@
         "educativo",
         "diseño"
       ],
+      "resourceLinks": [],
       "checklist": [
         {
           "id": "cl4",
@@ -308,6 +311,7 @@
         "stories",
         "promo"
       ],
+      "resourceLinks": [],
       "checklist": [
         {
           "id": "cl6",
@@ -347,6 +351,7 @@
         "dev",
         "captación"
       ],
+      "resourceLinks": [],
       "checklist": [
         {
           "id": "cl8",
@@ -385,6 +390,7 @@
       "labels": [
         "estrategia"
       ],
+      "resourceLinks": [],
       "checklist": [],
       "subtasks": [],
       "comments": [],
@@ -412,6 +418,7 @@
       "labels": [
         "publicado"
       ],
+      "resourceLinks": [],
       "checklist": [],
       "subtasks": [],
       "comments": [],
@@ -484,6 +491,27 @@
       "tokenHash": "fa255354bbdfac329f03caa61c6ff85a45c4e4fb7dd39a6e3358c417f1c902d1",
       "createdAt": "2026-04-21T05:10:10.947Z",
       "expiresAt": "2026-05-21T05:10:10.947Z"
+    },
+    {
+      "id": "s_70927fb44183",
+      "userId": "u1",
+      "tokenHash": "fd26ca36f1f565def4b25201bafdd438009429f058c4ff91513421f87399fdec",
+      "createdAt": "2026-04-22T01:26:39.662Z",
+      "expiresAt": "2026-05-22T01:26:39.662Z"
+    },
+    {
+      "id": "s_b73f67c12e83",
+      "userId": "u2",
+      "tokenHash": "0bab43e1a98d539b57d25fa2f0e1a5f5f128ac3e59fa98d7d7ef871984610700",
+      "createdAt": "2026-04-22T01:27:08.124Z",
+      "expiresAt": "2026-05-22T01:27:08.124Z"
+    },
+    {
+      "id": "s_483c89c5f30a",
+      "userId": "u2",
+      "tokenHash": "809c37babc1483074a1509efac9d9dd5addf2abc792e38c73baa099473bd4b82",
+      "createdAt": "2026-04-22T01:29:04.258Z",
+      "expiresAt": "2026-05-22T01:29:04.258Z"
     }
   ],
   "emailTokens": [],
@@ -595,6 +623,36 @@
     }
   ],
   "activityLogs": [
+    {
+      "id": "act_0974a37ec7b7",
+      "userId": "u2",
+      "kind": "login",
+      "label": "Inició sesión en Zia WorkSpace.",
+      "entityType": "session",
+      "entityId": "u2",
+      "meta": {},
+      "createdAt": "2026-04-22T01:29:05.202Z"
+    },
+    {
+      "id": "act_a9d5016458f2",
+      "userId": "u2",
+      "kind": "login",
+      "label": "Inició sesión en Zia WorkSpace.",
+      "entityType": "session",
+      "entityId": "u2",
+      "meta": {},
+      "createdAt": "2026-04-22T01:27:09.083Z"
+    },
+    {
+      "id": "act_dad093ea6f26",
+      "userId": "u1",
+      "kind": "login",
+      "label": "Inició sesión en Zia WorkSpace.",
+      "entityType": "session",
+      "entityId": "u1",
+      "meta": {},
+      "createdAt": "2026-04-22T01:26:40.621Z"
+    },
     {
       "id": "act_d7334c9f355f",
       "userId": "u1",
