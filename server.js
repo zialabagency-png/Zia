@@ -41,6 +41,22 @@ function nowIso() {
   return new Date().toISOString();
 }
 
+function zonedDateKey(date = new Date(), timeZone = process.env.APP_TIMEZONE || 'America/Santo_Domingo') {
+  try {
+    const parts = new Intl.DateTimeFormat('en-CA', {
+      timeZone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    }).formatToParts(new Date(date));
+    const year = parts.find((item) => item.type === 'year')?.value;
+    const month = parts.find((item) => item.type === 'month')?.value;
+    const day = parts.find((item) => item.type === 'day')?.value;
+    if (year && month && day) return `${year}-${month}-${day}`;
+  } catch (_error) {}
+  return new Date(date).toISOString().slice(0, 10);
+}
+
 function generateId(prefix = 'id') {
   return `${prefix}_${crypto.randomBytes(6).toString('hex')}`;
 }
@@ -428,7 +444,7 @@ function normalizeActivityLog(log = {}) {
 }
 
 function todayDateKey() {
-  return normalizeDate(new Date());
+  return zonedDateKey(new Date());
 }
 
 function defaultSeedData() {
