@@ -93,7 +93,8 @@ const els = {
   clientModalTitle: document.getElementById('clientModalTitle'),
   userModalTitle: document.getElementById('userModalTitle'),
   deleteTaskButton: document.getElementById('deleteTaskButton'),
-  deleteClientButton: document.getElementById('deleteClientButton')
+  deleteClientButton: document.getElementById('deleteClientButton'),
+  deleteUserButton: document.getElementById('deleteUserButton')
 };
 
 async function api(path, options = {}) {
@@ -184,6 +185,13 @@ function statusClass(key) {
 
 function isAdmin() {
   return state.currentUser?.role === 'Admin';
+}
+
+function canDeleteUser(user) {
+  if (!isAdmin() || !user) return false;
+  if (user.id === state.currentUser?.id) return false;
+  if (user.role !== 'Admin') return true;
+  return state.users.filter((item) => item.role === 'Admin' && item.id !== user.id).length > 0;
 }
 
 function normalizeUrl(value) {
@@ -1009,168 +1017,158 @@ function renderAdmin() {
     return;
   }
   const settings = state.notificationSettings || {};
-  const teamCards = state.users.map((user) => {
-    const metrics = getUserRemoteMetrics(user.id);
-    const session = metrics.todaySession;
-    const lastActivity = metrics.lastActivity;
-    return `
-      <article class="remote-user-card ${workStatusClass(session?.status || 'offline')}">
-        <div class="client-card-header remote-user-head">
-          <div>
-            <h3 class="client-name">${escapeHtml(user.name)}</h3>
-            <div class="small-text">${escapeHtml(user.role)}</div>
-          </div>
-          <span class="badge ${workStatusClass(session?.status || 'offline')}">${escapeHtml(workStatusLabel(session?.status || 'offline'))}</span>
-        </div>
-        <div class="remote-user-metrics">
-          <div><strong>${session?.checkInAt ? formatDateTime(session.checkInAt) : '—'}</strong><span>Entrada</span></div>
-          <div><strong>${session?.checkOutAt ? formatDateTime(session.checkOutAt) : '—'}</strong><span>Salida</span></div>
-          <div><strong>${escapeHtml(getSessionWorkedLabel(session))}</strong><span>Tiempo</span></div>
-          <div><strong>${metrics.openTasks}</strong><span>Tareas activas</span></div>
-          <div><strong>${metrics.openSubtasks}</strong><span>Subtareas abiertas</span></div>
-          <div><strong>${metrics.overdueTasks}</strong><span>Vencidas</span></div>
-        </div>
-        <div class="remote-copy-block">
-          <strong>Plan de hoy</strong>
-          <p class="small-text">${escapeHtml(session?.focusPlan || 'Sin plan registrado.')}</p>
-        </div>
-        <div class="remote-copy-block">
-          <strong>Bloqueos</strong>
-          <p class="small-text">${escapeHtml(session?.blockers || 'Sin bloqueos reportados.')}</p>
-        </div>
-        <div class="remote-copy-block">
-          <strong>Última actividad</strong>
-          <p class="small-text">${lastActivity ? `${escapeHtml(lastActivity.label)} · ${escapeHtml(formatDateTime(lastActivity.createdAt))}` : 'Sin actividad reciente.'}</p>
-        </div>
-      </article>
-    `;
-  }).join('');
   const teamCheckedIn = state.users.filter((user) => getTodaySession(user.id)?.checkInAt).length;
   const teamCheckedOut = state.users.filter((user) => getTodaySession(user.id)?.checkOutAt).length;
   const totalOverdue = state.users.reduce((acc, user) => acc + getUserRemoteMetrics(user.id).overdueTasks, 0);
   const recentActivity = (state.activityLogs || []).slice(0, 20);
+  const activeUsers = state.users.filter((user) => user.status === 'active').length;
+  const invitedUsers = state.users.filter((user) => user.status === 'invited').length;
+  const adminCount = state.users.filter((user) => user.role === 'Admin').length;
+
+  const teamCards = state.users.map((user) => {
+    const metrics = getUserRemoteMetrics(user.id);
+    const session = metrics.todaySession;
+    const lastActivity = metrics.lastActivity;
+    const isCurrent = user.id === state.currentUser?.id;
+    return `
+      <article class="admin-user-card ${workStatusClass(session?.status || 'offline')}">
+        <div class="admin-user-card-top">
+          <div>
+            <div class="admin-user-name-row">
+              <h3 class="client-name">${escapeHtml(user.name)}</h3>
+              ${isCurrent ? '<span class="badge accent-badge">Tu cuenta</span>' : ''}
+            </div>
+            <div class="small-text">${escapeHtml(user.role)} · ${escapeHtml(user.email)}</div>
+          </div>
+          <span class="badge ${workStatusClass(session?.status || 'offline')}">${escapeHtml(workStatusLabel(session?.status || 'offline'))}</span>
+        </div>
+        <div class="admin-user-mini-grid">
+          <div class="mini-stat"><span>Estado</span><strong>${escapeHtml(user.status || 'active')}</strong></div>
+          <div class="mini-stat"><span>Último acceso</span><strong>${escapeHtml(formatDateTime(user.lastLoginAt))}</strong></div>
+          <div class="mini-stat"><span>Entrada</span><strong>${session?.checkInAt ? escapeHtml(formatDateTime(session.checkInAt)) : '—'}</strong></div>
+          <div class="mini-stat"><span>Salida</span><strong>${session?.checkOutAt ? escapeHtml(formatDateTime(session.checkOutAt)) : '—'}</strong></div>
+        </div>
+        <div class="admin-user-chip-row">
+          <span class="badge">${metrics.openTasks} tareas activas</span>
+          <span class="badge">${metrics.openSubtasks} subtareas abiertas</span>
+          <span class="badge">${metrics.overdueTasks} vencidas</span>
+          <span class="badge">${escapeHtml(getSessionWorkedLabel(session))}</span>
+        </div>
+        <div class="admin-user-copy-grid">
+          <div class="remote-copy-block compact-copy">
+            <strong>Plan de hoy</strong>
+            <p class="small-text">${escapeHtml(session?.focusPlan || 'Sin plan registrado.')}</p>
+          </div>
+          <div class="remote-copy-block compact-copy">
+            <strong>Bloqueos</strong>
+            <p class="small-text">${escapeHtml(session?.blockers || 'Sin bloqueos reportados.')}</p>
+          </div>
+        </div>
+        <div class="admin-user-footer">
+          <div class="small-text">${lastActivity ? `${escapeHtml(lastActivity.label)} · ${escapeHtml(formatDateTime(lastActivity.createdAt))}` : 'Sin actividad reciente.'}</div>
+          <div class="table-actions compact-actions">
+            <button class="text-button" data-edit-user="${user.id}">Editar</button>
+            <button class="text-button" data-send-invite="${user.id}">Invitar</button>
+            <button class="text-button" data-send-reset="${user.id}">Reset email</button>
+            ${canDeleteUser(user) ? `<button class="danger-button subtle-danger" data-delete-user="${user.id}">Eliminar</button>` : ''}
+          </div>
+        </div>
+      </article>
+    `;
+  }).join('');
 
   els.workspace.innerHTML = `
-    <div class="admin-grid">
-      <section class="panel table-wrap">
-        <div class="panel-header">
+    <div class="admin-grid enhanced-admin-grid">
+      <section class="panel admin-users-panel full-span">
+        <div class="panel-header admin-section-header">
           <div>
             <p class="eyebrow">Usuarios</p>
             <h3 class="panel-title">Equipo y accesos</h3>
+            <p class="small-text">Controla roles, invitaciones, recuperación de acceso y eliminación segura de usuarios.</p>
+          </div>
+          <div class="admin-summary-pills">
+            <span class="badge">${state.users.length} usuarios</span>
+            <span class="badge">${activeUsers} activos</span>
+            <span class="badge">${invitedUsers} invitados</span>
+            <span class="badge">${adminCount} admin</span>
           </div>
         </div>
-        <table class="data-table stacked-table">
-          <thead>
-            <tr>
-              <th>Nombre</th>
-              <th>Rol</th>
-              <th>Estado</th>
-              <th>Correo</th>
-              <th>Acciones</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${state.users.map((user) => `
-              <tr>
-                <td data-label="Nombre">
-                  <strong>${escapeHtml(user.name)}</strong>
-                  <div class="table-subtext">Último acceso ${escapeHtml(formatDateTime(user.lastLoginAt))}</div>
-                </td>
-                <td data-label="Rol">${escapeHtml(user.role)}</td>
-                <td data-label="Estado"><span class="badge">${escapeHtml(user.status || 'active')}</span></td>
-                <td data-label="Correo">${escapeHtml(user.email)}</td>
-                <td data-label="Acciones">
-                  <div class="table-actions">
-                    <button class="text-button" data-edit-user="${user.id}">Editar</button>
-                    <button class="text-button" data-send-invite="${user.id}">Invitar</button>
-                    <button class="text-button" data-send-reset="${user.id}">Reset email</button>
-                  </div>
-                </td>
-              </tr>
-            `).join('')}
-          </tbody>
-        </table>
+        <div class="admin-users-grid">
+          ${teamCards}
+        </div>
       </section>
-      <section class="panel">
-        <div class="panel-header">
+      <section class="panel admin-mail-panel">
+        <div class="panel-header admin-section-header">
           <div>
             <p class="eyebrow">SMTP y recordatorios</p>
             <h3 class="panel-title">Ajustes de correo</h3>
+            <p class="small-text">Define cómo se envían invitaciones, recuperación de acceso y recordatorios del workspace.</p>
           </div>
         </div>
-        <form class="stack-form" id="notificationSettingsForm">
-          <label class="field checkbox-row">
-            <span>Activar correos automáticos</span>
-            <input id="notifEnabled" type="checkbox" ${settings.enabled ? 'checked' : ''} />
-          </label>
-          <label class="field">
-            <span>Zona horaria</span>
-            <input id="notifTimezone" value="${escapeHtml(settings.timezone || 'America/Santo_Domingo')}" />
-          </label>
-          <label class="field checkbox-row">
-            <span>Email al asignar tarea</span>
-            <input id="notifAssignmentEmails" type="checkbox" ${settings.assignmentEmails ? 'checked' : ''} />
-          </label>
-          <label class="field checkbox-row">
-            <span>Resumen diario</span>
-            <input id="notifDailyDigestEnabled" type="checkbox" ${settings.dailyDigestEnabled ? 'checked' : ''} />
-          </label>
-          <label class="field">
-            <span>Hora del resumen diario</span>
-            <input id="notifDailyDigestHour" type="number" min="0" max="23" value="${Number(settings.dailyDigestHour ?? 8)}" />
-          </label>
-          <label class="field checkbox-row">
-            <span>Enviar resumen también fines de semana</span>
-            <input id="notifWeekendDigest" type="checkbox" ${settings.weekendDigest ? 'checked' : ''} />
-          </label>
-          <label class="field checkbox-row">
-            <span>Recordatorios de tareas por vencer</span>
-            <input id="notifDueSoonEnabled" type="checkbox" ${settings.dueSoonEnabled ? 'checked' : ''} />
-          </label>
-          <label class="field">
-            <span>Ventana antes del vencimiento (horas)</span>
-            <input id="notifDueSoonHours" type="number" min="1" max="240" value="${Number(settings.dueSoonHours ?? 24)}" />
-          </label>
-          <label class="field checkbox-row">
-            <span>Recordatorios de tareas vencidas</span>
-            <input id="notifOverdueEnabled" type="checkbox" ${settings.overdueEnabled ? 'checked' : ''} />
-          </label>
-          <label class="field">
-            <span>Repetir vencidas cada (horas)</span>
-            <input id="notifOverdueRepeatHours" type="number" min="1" max="240" value="${Number(settings.overdueRepeatHours ?? 24)}" />
-          </label>
-          <div class="table-actions">
+        <form class="stack-form settings-form-grid" id="notificationSettingsForm">
+          <div class="settings-group-card settings-group-card-highlight">
+            <label class="field checkbox-row">
+              <span>Activar correos automáticos</span>
+              <input id="notifEnabled" type="checkbox" ${settings.enabled ? 'checked' : ''} />
+            </label>
+            <label class="field">
+              <span>Zona horaria</span>
+              <input id="notifTimezone" value="${escapeHtml(settings.timezone || 'America/Santo_Domingo')}" />
+            </label>
+          </div>
+          <div class="settings-group-card">
+            <label class="field checkbox-row">
+              <span>Email al asignar tarea</span>
+              <input id="notifAssignmentEmails" type="checkbox" ${settings.assignmentEmails ? 'checked' : ''} />
+            </label>
+            <label class="field checkbox-row">
+              <span>Resumen diario</span>
+              <input id="notifDailyDigestEnabled" type="checkbox" ${settings.dailyDigestEnabled ? 'checked' : ''} />
+            </label>
+            <label class="field">
+              <span>Hora del resumen diario</span>
+              <input id="notifDailyDigestHour" type="number" min="0" max="23" value="${Number(settings.dailyDigestHour ?? 8)}" />
+            </label>
+            <label class="field checkbox-row">
+              <span>Enviar resumen también fines de semana</span>
+              <input id="notifWeekendDigest" type="checkbox" ${settings.weekendDigest ? 'checked' : ''} />
+            </label>
+          </div>
+          <div class="settings-group-card">
+            <label class="field checkbox-row">
+              <span>Recordatorios de tareas por vencer</span>
+              <input id="notifDueSoonEnabled" type="checkbox" ${settings.dueSoonEnabled ? 'checked' : ''} />
+            </label>
+            <label class="field">
+              <span>Ventana antes del vencimiento (horas)</span>
+              <input id="notifDueSoonHours" type="number" min="1" max="240" value="${Number(settings.dueSoonHours ?? 24)}" />
+            </label>
+            <label class="field checkbox-row">
+              <span>Recordatorios de tareas vencidas</span>
+              <input id="notifOverdueEnabled" type="checkbox" ${settings.overdueEnabled ? 'checked' : ''} />
+            </label>
+            <label class="field">
+              <span>Repetir vencidas cada (horas)</span>
+              <input id="notifOverdueRepeatHours" type="number" min="1" max="240" value="${Number(settings.overdueRepeatHours ?? 24)}" />
+            </label>
+          </div>
+          <div class="table-actions settings-actions-row">
             <button class="primary-button" type="submit">Guardar ajustes</button>
             <button class="secondary-button" id="runRemindersButton" type="button">Ejecutar recordatorios ahora</button>
           </div>
           <p class="small-text">Usa SMTP para invitaciones, recuperación y recordatorios automáticos. Si SMTP no está configurado, Zia WorkSpace seguirá registrando el envío en el log interno.</p>
         </form>
       </section>
-      <section class="panel full-span">
-        <div class="panel-header">
-          <div>
-            <p class="eyebrow">Control remoto</p>
-            <h3 class="panel-title">Monitoreo de equipo</h3>
-          </div>
-        </div>
-        <div class="stats-grid compact-grid">
-          <article class="stat-card"><p class="small-text">Con entrada hoy</p><div class="stat-value">${teamCheckedIn}</div></article>
-          <article class="stat-card"><p class="small-text">Con salida registrada</p><div class="stat-value">${teamCheckedOut}</div></article>
-          <article class="stat-card"><p class="small-text">Tareas vencidas</p><div class="stat-value">${totalOverdue}</div></article>
-          <article class="stat-card"><p class="small-text">Actividad reciente</p><div class="stat-value">${recentActivity.length}</div></article>
-        </div>
-        <div class="remote-user-grid">${teamCards}</div>
-      </section>
-      <section class="panel">
-        <div class="panel-header">
+      <section class="panel admin-activity-panel">
+        <div class="panel-header admin-section-header">
           <div>
             <p class="eyebrow">Actividad</p>
             <h3 class="panel-title">Bitácora del equipo</h3>
           </div>
         </div>
-        <div class="activity-feed">
+        <div class="activity-feed admin-activity-feed">
           ${recentActivity.length ? recentActivity.map((item) => `
-            <article class="activity-item">
+            <article class="activity-item admin-activity-item">
               <div class="activity-top">
                 <strong>${escapeHtml(getUserName(item.userId))}</strong>
                 <span class="small-text">${escapeHtml(formatDateTime(item.createdAt))}</span>
@@ -1181,25 +1179,39 @@ function renderAdmin() {
           `).join('') : `<div class="empty-state">Todavía no hay actividad registrada.</div>`}
         </div>
       </section>
-      <section class="panel">
-        <div class="panel-header">
+      <section class="panel admin-email-panel">
+        <div class="panel-header admin-section-header">
           <div>
             <p class="eyebrow">Emails</p>
-            <h3 class="panel-title">Actividad reciente</h3>
+            <h3 class="panel-title">Últimos envíos</h3>
           </div>
         </div>
-        <div class="stack-form">
-          ${state.emailLogs.length ? state.emailLogs.map((log) => `
-            <article class="email-log-card">
-              <div class="client-card-header">
+        <div class="activity-feed admin-email-feed">
+          ${state.emailLogs.length ? state.emailLogs.slice(0, 10).map((log) => `
+            <article class="email-log-card admin-email-card">
+              <div class="activity-top">
                 <strong>${escapeHtml(log.subject)}</strong>
-                <span class="badge">${escapeHtml(log.mode)}</span>
+                <span class="small-text">${escapeHtml(formatDateTime(log.createdAt))}</span>
               </div>
-              <div class="small-text">Para ${escapeHtml(log.toEmail)} · ${escapeHtml(formatDateTime(log.createdAt))}</div>
-              <p class="small-text">${escapeHtml(log.textBody.slice(0, 150))}${log.textBody.length > 150 ? '…' : ''}</p>
+              <div class="small-text">Para ${escapeHtml(log.toEmail)} · ${escapeHtml(log.mode)}</div>
+              <p class="small-text">${escapeHtml(log.textBody.slice(0, 140))}${log.textBody.length > 140 ? '…' : ''}</p>
               ${log.previewLink ? `<a class="link-button" href="${escapeHtml(log.previewLink)}" target="_blank">Abrir enlace</a>` : ''}
             </article>
           `).join('') : `<div class="empty-state">Todavía no hay envíos registrados.</div>`}
+        </div>
+      </section>
+      <section class="panel full-span admin-remote-panel">
+        <div class="panel-header admin-section-header">
+          <div>
+            <p class="eyebrow">Control remoto</p>
+            <h3 class="panel-title">Monitoreo de equipo</h3>
+          </div>
+        </div>
+        <div class="stats-grid compact-grid admin-top-stats">
+          <article class="stat-card"><p class="small-text">Con entrada hoy</p><div class="stat-value">${teamCheckedIn}</div></article>
+          <article class="stat-card"><p class="small-text">Con salida registrada</p><div class="stat-value">${teamCheckedOut}</div></article>
+          <article class="stat-card"><p class="small-text">Tareas vencidas</p><div class="stat-value">${totalOverdue}</div></article>
+          <article class="stat-card"><p class="small-text">Actividad reciente</p><div class="stat-value">${recentActivity.length}</div></article>
         </div>
       </section>
     </div>
@@ -1530,11 +1542,16 @@ function openUserModal(userId = '') {
   document.getElementById('userAccentField').value = user?.accent || 'default';
   document.getElementById('userPasswordField').value = '';
   document.getElementById('userSendInviteField').checked = !user;
+  els.deleteUserButton.classList.toggle('hidden', !canDeleteUser(user));
+  if (user?.id) els.deleteUserButton.dataset.userId = user.id;
+  else delete els.deleteUserButton.dataset.userId;
   els.userModalBackdrop.classList.remove('hidden');
 }
 
 function closeUserModal() {
   els.userModalBackdrop.classList.add('hidden');
+  delete els.deleteUserButton.dataset.userId;
+  els.deleteUserButton.classList.add('hidden');
   els.userForm.reset();
 }
 
@@ -1734,6 +1751,37 @@ function bindDynamicActions() {
       }
     });
   });
+  document.querySelectorAll('[data-delete-user]').forEach((button) => {
+    button.addEventListener('click', async () => {
+      const user = state.users.find((item) => item.id === button.dataset.deleteUser);
+      if (!user) return;
+      const confirmed = window.confirm(`¿Eliminar a ${user.name}? Se limpiarán sus sesiones y se quitará de tareas y clientes.`);
+      if (!confirmed) return;
+      try {
+        await api(`/api/admin/users/${user.id}`, { method: 'DELETE' });
+        showToast('Usuario eliminado', 'El usuario fue removido correctamente.');
+        await refreshBootstrap();
+      } catch (error) {
+        showToast('Error', error.message, 'error');
+      }
+    });
+  });
+  if (els.deleteUserButton) {
+    els.deleteUserButton.onclick = async () => {
+      const user = state.users.find((item) => item.id === els.deleteUserButton.dataset.userId);
+      if (!user) return;
+      const confirmed = window.confirm(`¿Eliminar a ${user.name}? Se limpiarán sus sesiones y se quitará de tareas y clientes.`);
+      if (!confirmed) return;
+      try {
+        await api(`/api/admin/users/${user.id}`, { method: 'DELETE' });
+        closeUserModal();
+        showToast('Usuario eliminado', 'El usuario fue removido correctamente.');
+        await refreshBootstrap();
+      } catch (error) {
+        showToast('Error', error.message, 'error');
+      }
+    };
+  }
   const notificationSettingsForm = document.getElementById('notificationSettingsForm');
   if (notificationSettingsForm) {
     notificationSettingsForm.addEventListener('submit', async (event) => {
