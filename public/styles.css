@@ -1,12 +1,12 @@
 :root {
-  --bg: #090b10;
-  --bg-soft: #10141d;
-  --panel: rgba(19, 23, 34, 0.92);
-  --panel-2: rgba(24, 29, 42, 0.96);
-  --line: rgba(255, 255, 255, 0.08);
+  --bg: #000000;
+  --bg-soft: #050505;
+  --panel: rgba(4, 4, 4, 0.96);
+  --panel-2: rgba(10, 10, 10, 0.98);
+  --line: rgba(255, 255, 255, 0.09);
   --line-strong: rgba(255, 255, 255, 0.16);
-  --text: #eef2ff;
-  --muted: #98a4c0;
+  --text: #f3f5fb;
+  --muted: #a1abc4;
   --orange: #ff6b00;
   --orange-soft: rgba(255, 107, 0, 0.14);
   --silver: #d4d5da;
@@ -15,7 +15,7 @@
   --red: #ef5b5b;
   --blue: #4d8bff;
   --radius: 22px;
-  --shadow: 0 22px 50px rgba(0, 0, 0, 0.28);
+  --shadow: 0 24px 60px rgba(0, 0, 0, 0.42);
 }
 
 * {
@@ -28,14 +28,24 @@ body {
   min-height: 100%;
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   background:
-    radial-gradient(circle at 12% 12%, rgba(255, 107, 0, 0.14), transparent 0 24%),
-    radial-gradient(circle at 85% 10%, rgba(77, 139, 255, 0.08), transparent 0 18%),
-    linear-gradient(180deg, #07090d, #0b0e14 58%, #090b10);
+    radial-gradient(circle at 18% 8%, rgba(255, 107, 0, 0.12), transparent 0 18%),
+    radial-gradient(circle at 82% 12%, rgba(255, 107, 0, 0.05), transparent 0 14%),
+    linear-gradient(180deg, #000000, #020202 52%, #000000);
   color: var(--text);
+  color-scheme: dark;
 }
 
 body {
   padding: 16px;
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(circle at top center, rgba(255, 107, 0, 0.06), transparent 0 28%);
+  opacity: 0.9;
 }
 
 button,
@@ -117,7 +127,7 @@ h4 {
 .sidebar,
 .main-content,
 .modal-card {
-  background: var(--panel);
+  background: linear-gradient(180deg, rgba(2, 2, 2, 0.98), rgba(8, 8, 8, 0.96));
   border: 1px solid var(--line);
   box-shadow: var(--shadow);
   backdrop-filter: blur(18px);
@@ -145,7 +155,7 @@ h4 {
 .brand-block {
   padding: 18px 16px;
   border-radius: 24px;
-  background: linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0.025));
+  background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
   border: 1px solid var(--line);
 }
 
@@ -195,7 +205,7 @@ h4 {
   display: inline-flex;
   gap: 8px;
   padding: 6px;
-  background: rgba(255, 255, 255, 0.03);
+  background: rgba(255, 255, 255, 0.015);
   border: 1px solid var(--line);
   border-radius: 16px;
 }
@@ -214,7 +224,7 @@ h4 {
 .segmented button.active,
 .auth-tab:hover,
 .segmented button:hover {
-  background: rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.03);
   color: var(--text);
 }
 
@@ -256,7 +266,7 @@ h4 {
   width: 100%;
   border-radius: 16px;
   border: 1px solid var(--line);
-  background: rgba(255, 255, 255, 0.035);
+  background: rgba(255, 255, 255, 0.02);
   color: var(--text);
   padding: 12px 14px;
   outline: none;
@@ -280,7 +290,7 @@ h4 {
   padding: 12px 14px;
   border: 1px solid var(--line);
   border-radius: 16px;
-  background: rgba(255,255,255,0.03);
+  background: rgba(255,255,255,0.015);
 }
 
 .checkbox-field input {
@@ -333,7 +343,7 @@ code {
 }
 
 .secondary-button {
-  background: rgba(255, 255, 255, 0.04);
+  background: rgba(255, 255, 255, 0.02);
 }
 
 .primary-button {
@@ -363,7 +373,7 @@ code {
 .ghost-button:hover,
 .text-button:hover,
 .close-button:hover {
-  background: rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.03);
 }
 
 .danger-button {
@@ -406,14 +416,14 @@ code {
 
 .nav-item:hover,
 .nav-item.active {
-  background: rgba(255, 255, 255, 0.05);
+  background: rgba(255, 255, 255, 0.025);
   border-color: var(--line);
   color: var(--text);
 }
 
 .sidebar-panel,
 .panel {
-  background: rgba(255,255,255,0.03);
+  background: rgba(255,255,255,0.015);
   border: 1px solid var(--line);
   border-radius: 22px;
 }
@@ -516,7 +526,7 @@ code {
 .activity-item,
 .remote-user-card {
   border: 1px solid var(--line);
-  background: rgba(255,255,255,0.03);
+  background: rgba(255,255,255,0.015);
   border-radius: 18px;
 }
 
@@ -559,7 +569,7 @@ code {
   padding: 10px 12px;
   border-radius: 14px;
   border: 1px solid var(--line);
-  background: rgba(255,255,255,0.035);
+  background: rgba(255,255,255,0.02);
   display: grid;
   gap: 4px;
 }
@@ -611,7 +621,7 @@ code {
 .stat-card {
   padding: 18px;
   border-radius: 22px;
-  background: linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0.02));
+  background: linear-gradient(180deg, rgba(255,255,255,0.018), rgba(255,255,255,0.008));
   border: 1px solid var(--line);
 }
 
@@ -632,7 +642,7 @@ code {
 .board-column {
   min-height: 300px;
   padding: 14px;
-  background: rgba(255, 255, 255, 0.03);
+  background: rgba(255, 255, 255, 0.015);
   border: 1px solid var(--line);
   border-radius: 22px;
   display: grid;
@@ -695,7 +705,7 @@ code {
 .email-log-card,
 .list-card {
   border: 1px solid var(--line);
-  background: rgba(255, 255, 255, 0.03);
+  background: rgba(255, 255, 255, 0.015);
   border-radius: 18px;
 }
 
@@ -841,7 +851,7 @@ code {
   width: 100%;
   height: 8px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.05);
+  background: rgba(255, 255, 255, 0.025);
   overflow: hidden;
 }
 
@@ -874,13 +884,13 @@ code {
   padding: 9px 10px;
   border-radius: 14px;
   border: 1px solid var(--line);
-  background: rgba(255,255,255,0.03);
+  background: rgba(255,255,255,0.015);
 }
 
 .modal-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(5, 8, 14, 0.72);
+  background: rgba(0, 0, 0, 0.78);
   display: grid;
   place-items: center;
   padding: 16px;
@@ -919,7 +929,7 @@ code {
   padding: 14px 16px;
   border-radius: 18px;
   border: 1px solid var(--line);
-  background: rgba(15, 19, 29, 0.96);
+  background: rgba(4, 4, 4, 0.98);
   box-shadow: var(--shadow);
 }
 
@@ -1142,7 +1152,7 @@ code {
   .stacked-table tr {
     border: 1px solid var(--line);
     border-radius: 18px;
-    background: rgba(255, 255, 255, 0.03);
+    background: rgba(255, 255, 255, 0.015);
     padding: 12px;
   }
 
@@ -1292,7 +1302,7 @@ code {
   border: 1px solid var(--line);
   border-radius: 12px;
   padding: 9px 12px;
-  background-color: rgba(16, 18, 24, 0.9);
+  background-color: rgba(4, 4, 4, 0.98);
 }
 
 .inline-status-wrap {
@@ -1363,7 +1373,7 @@ code {
   padding: 14px;
   border-radius: 18px;
   border: 1px solid var(--line);
-  background: rgba(255,255,255,0.03);
+  background: rgba(255,255,255,0.015);
 }
 
 .subtask-row-actions {
@@ -1570,7 +1580,7 @@ code {
   padding: 12px;
   border-radius: 16px;
   border: 1px dashed rgba(255,255,255,0.18);
-  background: rgba(255,255,255,0.03);
+  background: rgba(255,255,255,0.015);
   color: var(--muted);
 }
 
@@ -1718,7 +1728,7 @@ code {
   .stacked-table tr {
     border: 1px solid var(--panel-border);
     border-radius: 18px;
-    background: rgba(255,255,255,0.03);
+    background: rgba(255,255,255,0.015);
     padding: 12px;
   }
 
@@ -1812,5 +1822,59 @@ code {
   .toast {
     width: 100%;
     min-width: 0;
+  }
+}
+
+
+.sidebar,
+.main-content,
+.auth-card,
+.modal-card {
+  position: relative;
+}
+
+.sidebar::before,
+.main-content::before,
+.auth-card::before,
+.modal-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.03);
+}
+
+.primary-button {
+  box-shadow: 0 18px 40px rgba(255, 107, 0, 0.18);
+}
+
+.sidebar-panel,
+.panel,
+.task-card,
+.client-card,
+.calendar-day,
+.user-row,
+.email-log-card,
+.list-card,
+.remote-user-card,
+.activity-item,
+.board-column,
+.stat-card {
+  background-color: rgba(7, 7, 7, 0.96);
+}
+
+.progress-bar {
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.calendar-item {
+  background: rgba(255, 107, 0, 0.1);
+  border: 1px solid rgba(255, 107, 0, 0.24);
+}
+
+@media (max-width: 860px) {
+  body {
+    background: linear-gradient(180deg, #000000, #010101 58%, #000000);
   }
 }
