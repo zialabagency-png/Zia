@@ -175,6 +175,35 @@ function getTaskAssigneeIds(task = {}) {
   return uniqStrings([task.assigneeId]);
 }
 
+function normalizeResourceLink(link = {}) {
+  const raw = typeof link === 'string' ? link : (link.url || '');
+  const url = String(raw || '').trim();
+  if (!url) return null;
+  const normalized = /^https?:\/\//i.test(url) ? url : `https://${url}`;
+  let finalUrl = normalized;
+  try {
+    finalUrl = new URL(normalized).toString();
+  } catch (_error) {}
+  const provider = String((typeof link === 'object' && link.provider) || '').trim() || (() => {
+    try {
+      const host = new URL(finalUrl).hostname.toLowerCase();
+      if (host.includes('canva.com')) return 'Canva';
+      if (host.includes('drive.google.com') || host.includes('docs.google.com')) return 'Drive';
+      if (host.includes('figma.com')) return 'Figma';
+      if (host.includes('notion.so')) return 'Notion';
+      return 'Link';
+    } catch (_error) {
+      return 'Link';
+    }
+  })();
+  return {
+    id: (typeof link === 'object' && link.id) || generateId('rl'),
+    url: finalUrl,
+    provider,
+    label: String((typeof link === 'object' && (link.label || link.provider)) || provider).trim() || provider
+  };
+}
+
 function normalizeTask(task) {
   const now = nowIso();
   const assigneeIds = getTaskAssigneeIds(task);
@@ -194,6 +223,7 @@ function normalizeTask(task) {
     publishDate: normalizeDate(task.publishDate),
     approvalRequired: Boolean(task.approvalRequired),
     labels: uniqStrings(task.labels),
+    resourceLinks: normalizeArray(task.resourceLinks).map(normalizeResourceLink).filter(Boolean),
     checklist: normalizeArray(task.checklist).map((item) => ({
       id: item.id || generateId('cl'),
       text: String(item.text || '').trim(),
@@ -860,9 +890,9 @@ function createPostgresAdapter() {
     }
     for (const task of seed.tasks.map(normalizeTask)) {
       await query(
-        `INSERT INTO tasks (id, title, description, client_id, type, channel, format, assignee_id, assignee_ids, priority, status, due_date, publish_date, approval_required, labels, checklist, subtasks, comments, created_by_id, created_at, updated_at)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,$10,$11,$12,$13,$14,$15::jsonb,$16::jsonb,$17::jsonb,$18::jsonb,$19,$20,$21)`,
-        [task.id, task.title, task.description, task.clientId || null, task.type, task.channel, task.format, task.assigneeId || null, JSON.stringify(task.assigneeIds || []), task.priority, task.status, task.dueDate || null, task.publishDate || null, task.approvalRequired, JSON.stringify(task.labels), JSON.stringify(task.checklist), JSON.stringify(task.subtasks || []), JSON.stringify(task.comments), task.createdById || null, task.createdAt, task.updatedAt]
+        `INSERT INTO tasks (id, title, description, client_id, type, channel, format, assignee_id, assignee_ids, priority, status, due_date, publish_date, approval_required, resource_links, labels, checklist, subtasks, comments, created_by_id, created_at, updated_at)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,$10,$11,$12,$13,$14,$15::jsonb,$16::jsonb,$17::jsonb,$18::jsonb,$19::jsonb,$20,$21,$22)`,
+        [task.id, task.title, task.description, task.clientId || null, task.type, task.channel, task.format, task.assigneeId || null, JSON.stringify(task.assigneeIds || []), task.priority, task.status, task.dueDate || null, task.publishDate || null, task.approvalRequired, JSON.stringify(task.resourceLinks || []), JSON.stringify(task.labels), JSON.stringify(task.checklist), JSON.stringify(task.subtasks || []), JSON.stringify(task.comments), task.createdById || null, task.createdAt, task.updatedAt]
       );
     }
     for (const session of seed.workSessions.map(normalizeWorkSession)) {
@@ -932,6 +962,7 @@ function createPostgresAdapter() {
       labels: row.labels || [],
       checklist: row.checklist || [],
       subtasks: row.subtasks || [],
+      resourceLinks: row.resource_links || [],
       comments: row.comments || [],
       createdById: row.created_by_id || '',
       createdAt: row.created_at,
@@ -1033,6 +1064,7 @@ function createPostgresAdapter() {
           due_date DATE,
           publish_date DATE,
           approval_required BOOLEAN NOT NULL DEFAULT FALSE,
+          resource_links JSONB NOT NULL DEFAULT '[]'::jsonb,
           labels JSONB NOT NULL DEFAULT '[]'::jsonb,
           checklist JSONB NOT NULL DEFAULT '[]'::jsonb,
           subtasks JSONB NOT NULL DEFAULT '[]'::jsonb,
@@ -1114,6 +1146,7 @@ function createPostgresAdapter() {
       `);
       await query(`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS assignee_ids JSONB NOT NULL DEFAULT '[]'::jsonb`);
       await query(`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS subtasks JSONB NOT NULL DEFAULT '[]'::jsonb`);
+      await query(`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS resource_links JSONB NOT NULL DEFAULT '[]'::jsonb`);
       await query(`UPDATE tasks SET assignee_ids = CASE WHEN assignee_id IS NULL OR assignee_id = '' THEN '[]'::jsonb ELSE jsonb_build_array(assignee_id) END WHERE assignee_ids IS NULL OR assignee_ids = '[]'::jsonb`);
       await seedIfNeeded();
       await query('DELETE FROM sessions WHERE expires_at <= NOW()');
@@ -1247,17 +1280,17 @@ function createPostgresAdapter() {
         if (!currentRes.rows[0]) return null;
         const merged = normalizeTask({ ...mapTaskRow(currentRes.rows[0]), ...payload, id: payload.id, updatedAt: nowIso() });
         await query(
-          `UPDATE tasks SET title=$2, description=$3, client_id=$4, type=$5, channel=$6, format=$7, assignee_id=$8, assignee_ids=$9::jsonb, priority=$10, status=$11, due_date=$12, publish_date=$13, approval_required=$14, labels=$15::jsonb, checklist=$16::jsonb, subtasks=$17::jsonb, comments=$18::jsonb, created_by_id=$19, updated_at=$20 WHERE id=$1`,
-          [merged.id, merged.title, merged.description, merged.clientId || null, merged.type, merged.channel, merged.format, merged.assigneeId || null, JSON.stringify(merged.assigneeIds || []), merged.priority, merged.status, merged.dueDate || null, merged.publishDate || null, merged.approvalRequired, JSON.stringify(merged.labels), JSON.stringify(merged.checklist), JSON.stringify(merged.subtasks || []), JSON.stringify(merged.comments), merged.createdById || null, merged.updatedAt]
+          `UPDATE tasks SET title=$2, description=$3, client_id=$4, type=$5, channel=$6, format=$7, assignee_id=$8, assignee_ids=$9::jsonb, priority=$10, status=$11, due_date=$12, publish_date=$13, approval_required=$14, resource_links=$15::jsonb, labels=$16::jsonb, checklist=$17::jsonb, subtasks=$18::jsonb, comments=$19::jsonb, created_by_id=$20, updated_at=$21 WHERE id=$1`,
+          [merged.id, merged.title, merged.description, merged.clientId || null, merged.type, merged.channel, merged.format, merged.assigneeId || null, JSON.stringify(merged.assigneeIds || []), merged.priority, merged.status, merged.dueDate || null, merged.publishDate || null, merged.approvalRequired, JSON.stringify(merged.resourceLinks || []), JSON.stringify(merged.labels), JSON.stringify(merged.checklist), JSON.stringify(merged.subtasks || []), JSON.stringify(merged.comments), merged.createdById || null, merged.updatedAt]
         );
         const attachmentsRes = await query('SELECT * FROM attachments WHERE task_id=$1 ORDER BY created_at DESC', [merged.id]);
         return { ...merged, attachments: attachmentsRes.rows.map(mapAttachmentRow) };
       }
       const task = normalizeTask(payload);
       await query(
-        `INSERT INTO tasks (id, title, description, client_id, type, channel, format, assignee_id, assignee_ids, priority, status, due_date, publish_date, approval_required, labels, checklist, subtasks, comments, created_by_id, created_at, updated_at)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,$10,$11,$12,$13,$14,$15::jsonb,$16::jsonb,$17::jsonb,$18::jsonb,$19,$20,$21)`,
-        [task.id, task.title, task.description, task.clientId || null, task.type, task.channel, task.format, task.assigneeId || null, JSON.stringify(task.assigneeIds || []), task.priority, task.status, task.dueDate || null, task.publishDate || null, task.approvalRequired, JSON.stringify(task.labels), JSON.stringify(task.checklist), JSON.stringify(task.subtasks || []), JSON.stringify(task.comments), task.createdById || null, task.createdAt, task.updatedAt]
+        `INSERT INTO tasks (id, title, description, client_id, type, channel, format, assignee_id, assignee_ids, priority, status, due_date, publish_date, approval_required, resource_links, labels, checklist, subtasks, comments, created_by_id, created_at, updated_at)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,$10,$11,$12,$13,$14,$15::jsonb,$16::jsonb,$17::jsonb,$18::jsonb,$19::jsonb,$20,$21,$22)`,
+        [task.id, task.title, task.description, task.clientId || null, task.type, task.channel, task.format, task.assigneeId || null, JSON.stringify(task.assigneeIds || []), task.priority, task.status, task.dueDate || null, task.publishDate || null, task.approvalRequired, JSON.stringify(task.resourceLinks || []), JSON.stringify(task.labels), JSON.stringify(task.checklist), JSON.stringify(task.subtasks || []), JSON.stringify(task.comments), task.createdById || null, task.createdAt, task.updatedAt]
       );
       return { ...task, attachments: [] };
     },
@@ -2048,7 +2081,7 @@ app.get('/api/tasks', requireAuth, async (req, res, next) => {
   }
 });
 
-app.post('/api/tasks', requireAuth, async (req, res, next) => {
+app.post('/api/tasks', requireAuth, requireAdmin, async (req, res, next) => {
   try {
     const payload = { ...req.body, createdById: req.currentUser.id, updatedAt: nowIso() };
     delete payload.id;
@@ -2154,7 +2187,7 @@ app.get('/api/clients', requireAuth, async (req, res, next) => {
   }
 });
 
-app.post('/api/clients', requireAuth, async (req, res, next) => {
+app.post('/api/clients', requireAuth, requireAdmin, async (req, res, next) => {
   try {
     const client = await adapter.saveClient({ ...req.body, updatedAt: nowIso() });
     res.status(201).json(client);
@@ -2163,7 +2196,7 @@ app.post('/api/clients', requireAuth, async (req, res, next) => {
   }
 });
 
-app.patch('/api/clients/:id', requireAuth, async (req, res, next) => {
+app.patch('/api/clients/:id', requireAuth, requireAdmin, async (req, res, next) => {
   try {
     const client = await adapter.saveClient({ ...req.body, id: req.params.id, updatedAt: nowIso() });
     if (!client) {
@@ -2176,7 +2209,7 @@ app.patch('/api/clients/:id', requireAuth, async (req, res, next) => {
   }
 });
 
-app.delete('/api/clients/:id', requireAuth, async (req, res, next) => {
+app.delete('/api/clients/:id', requireAuth, requireAdmin, async (req, res, next) => {
   try {
     const result = await adapter.deleteClient(req.params.id);
     if (!result.ok) {
