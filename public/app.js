@@ -323,6 +323,90 @@ function renderStatusOptions(selected = '') {
   return STATUS_CONFIG.map((status) => `<option value="${status.key}" ${status.key === selected ? 'selected' : ''}>${escapeHtml(status.label)}</option>`).join('');
 }
 
+function renderActivityFeedItems(items, emptyText = 'Aún no hay actividad registrada.') {
+  return items.length ? items.map((item) => `
+    <article class="activity-item">
+      <div class="activity-top">
+        <strong>${escapeHtml(item.label)}</strong>
+        <span class="small-text">${escapeHtml(formatDateTime(item.createdAt))}</span>
+      </div>
+      <div class="small-text">${escapeHtml(item.kind)}${item.entityType ? ` · ${escapeHtml(item.entityType)}` : ''}</div>
+    </article>
+  `).join('') : `<div class="empty-state">${escapeHtml(emptyText)}</div>`;
+}
+
+function renderWorkSessionPanel({ context = 'profile' } = {}) {
+  const session = getTodaySession(state.currentUser?.id);
+  const statusKey = session?.status || 'offline';
+  const isDashboard = context === 'dashboard';
+  return `
+    <section class="panel remote-control-panel ${isDashboard ? 'remote-dashboard-panel' : 'remote-profile-panel'}">
+      <div class="panel-header panel-header-spread">
+        <div>
+          <p class="eyebrow">Jornada remota</p>
+          <h3 class="panel-title">Mi control de trabajo</h3>
+        </div>
+        <div class="table-actions wrap-actions remote-actions">
+          <span class="badge stage-badge ${workStatusClass(statusKey)}">${escapeHtml(workStatusLabel(statusKey))}</span>
+          <button class="ghost-button" type="button" id="checkInButton" ${session?.checkInAt ? 'disabled' : ''}>Marcar entrada</button>
+          <button class="ghost-button" type="button" id="checkOutButton" ${session?.checkOutAt ? 'disabled' : ''}>Marcar salida</button>
+        </div>
+      </div>
+      <div class="stats-grid work-session-stats ${isDashboard ? 'dashboard-work-stats' : 'profile-work-stats'}">
+        <article class="stat-card stat-card-wide"><p class="small-text">Entrada</p><div class="stat-value small-value">${escapeHtml(formatDateTime(session?.checkInAt))}</div></article>
+        <article class="stat-card stat-card-wide"><p class="small-text">Salida</p><div class="stat-value small-value">${escapeHtml(formatDateTime(session?.checkOutAt))}</div></article>
+        <article class="stat-card"><p class="small-text">Tiempo</p><div class="stat-value small-value">${escapeHtml(getSessionWorkedLabel(session))}</div></article>
+        <article class="stat-card"><p class="small-text">Estado</p><div class="stat-value small-value">${escapeHtml(workStatusLabel(statusKey))}</div></article>
+      </div>
+      <form class="stack-form work-session-form ${isDashboard ? 'work-session-form-inline' : ''}" id="workSessionForm">
+        <label class="field work-field-status">
+          <span>Estado actual</span>
+          <select id="workStatus">${renderWorkStatusOptions(statusKey)}</select>
+        </label>
+        <label class="field work-field-plan ${isDashboard ? 'field-span-2' : ''}">
+          <span>Plan del día</span>
+          <textarea id="workFocusPlan" rows="${isDashboard ? '2' : '3'}" placeholder="Ej: calendario de Eves Dental, captions y revisión de reels">${escapeHtml(session?.focusPlan || '')}</textarea>
+        </label>
+        <label class="field work-field-blockers ${isDashboard ? 'field-span-2' : ''}">
+          <span>Bloqueos o necesidades</span>
+          <textarea id="workBlockers" rows="2" placeholder="Ej: esperando aprobación, falta material, feedback pendiente">${escapeHtml(session?.blockers || '')}</textarea>
+        </label>
+        <label class="field work-field-summary ${isDashboard ? 'field-span-2' : ''}">
+          <span>Resumen de cierre</span>
+          <textarea id="workEndSummary" rows="${isDashboard ? '2' : '3'}" placeholder="Qué dejaste listo hoy y qué sigue mañana">${escapeHtml(session?.endSummary || '')}</textarea>
+        </label>
+        <div class="work-form-footer ${isDashboard ? 'field-span-2' : ''}">
+          <button class="primary-button" type="submit">Guardar jornada</button>
+        </div>
+      </form>
+    </section>
+  `;
+}
+
+function renderMyMeasurementPanel({ limit = 12, compact = false } = {}) {
+  const myMetrics = getUserRemoteMetrics(state.currentUser?.id);
+  const myActivity = getUserActivityLogs(state.currentUser?.id, limit);
+  return `
+    <section class="panel remote-summary-panel ${compact ? 'remote-summary-compact' : ''}">
+      <div class="panel-header">
+        <div>
+          <p class="eyebrow">Mi medición</p>
+          <h3 class="panel-title">Carga y entregas</h3>
+        </div>
+      </div>
+      <div class="stats-grid compact-grid remote-metrics-grid">
+        <article class="stat-card"><p class="small-text">Tareas activas</p><div class="stat-value">${myMetrics.openTasks}</div></article>
+        <article class="stat-card"><p class="small-text">Subtareas abiertas</p><div class="stat-value">${myMetrics.openSubtasks}</div></article>
+        <article class="stat-card"><p class="small-text">Subtareas completadas</p><div class="stat-value">${myMetrics.completedSubtasks}</div></article>
+        <article class="stat-card"><p class="small-text">Tareas vencidas</p><div class="stat-value">${myMetrics.overdueTasks}</div></article>
+      </div>
+      <div class="activity-feed compact-feed remote-activity-feed">
+        ${renderActivityFeedItems(myActivity, 'Aún no hay actividad registrada.')}
+      </div>
+    </section>
+  `;
+}
+
 function renderAssigneeCheckboxes(selectedIds = []) {
   return state.users.map((user) => {
     const checked = selectedIds.includes(user.id) ? 'checked' : '';
@@ -569,6 +653,10 @@ function renderDashboard() {
   ` : '';
 
   els.workspace.innerHTML = `
+    <div class="remote-dashboard-grid">
+      ${renderWorkSessionPanel({ context: 'dashboard' })}
+      ${renderMyMeasurementPanel({ limit: 6, compact: true })}
+    </div>
     <div class="stats-grid">
       <article class="stat-card">
         <p class="small-text">Tareas filtradas</p>
@@ -654,6 +742,7 @@ function renderDashboard() {
       </section>
     </div>
   `;
+  bindWorkSessionControls();
 }
 
 function renderTasks() {
@@ -1063,9 +1152,6 @@ function renderAdmin() {
 }
 
 function renderProfile() {
-  const session = getTodaySession(state.currentUser?.id);
-  const myMetrics = getUserRemoteMetrics(state.currentUser?.id);
-  const myActivity = getUserActivityLogs(state.currentUser?.id, 12);
   els.workspace.innerHTML = `
     <div class="profile-grid">
       <section class="panel">
@@ -1106,68 +1192,8 @@ function renderProfile() {
           <button class="primary-button" type="submit">Actualizar contraseña</button>
         </form>
       </section>
-      <section class="panel">
-        <div class="panel-header">
-          <div>
-            <p class="eyebrow">Jornada remota</p>
-            <h3 class="panel-title">Mi control de trabajo</h3>
-          </div>
-          <div class="table-actions">
-            <button class="ghost-button" type="button" id="checkInButton" ${session?.checkInAt ? 'disabled' : ''}>Marcar entrada</button>
-            <button class="ghost-button" type="button" id="checkOutButton" ${session?.checkOutAt ? 'disabled' : ''}>Marcar salida</button>
-          </div>
-        </div>
-        <div class="stats-grid compact-grid">
-          <article class="stat-card"><p class="small-text">Entrada</p><div class="stat-value small-value">${escapeHtml(formatDateTime(session?.checkInAt))}</div></article>
-          <article class="stat-card"><p class="small-text">Salida</p><div class="stat-value small-value">${escapeHtml(formatDateTime(session?.checkOutAt))}</div></article>
-          <article class="stat-card"><p class="small-text">Tiempo</p><div class="stat-value small-value">${escapeHtml(getSessionWorkedLabel(session))}</div></article>
-          <article class="stat-card"><p class="small-text">Estado</p><div class="stat-value small-value">${escapeHtml(workStatusLabel(session?.status || 'available'))}</div></article>
-        </div>
-        <form class="stack-form" id="workSessionForm">
-          <label class="field">
-            <span>Estado actual</span>
-            <select id="workStatus">${renderWorkStatusOptions(session?.status || 'available')}</select>
-          </label>
-          <label class="field">
-            <span>Plan del día</span>
-            <textarea id="workFocusPlan" rows="3" placeholder="Ej: calendario de Eves Dental, captions y revisión de reels">${escapeHtml(session?.focusPlan || '')}</textarea>
-          </label>
-          <label class="field">
-            <span>Bloqueos o necesidades</span>
-            <textarea id="workBlockers" rows="2" placeholder="Ej: esperando aprobación, falta material, feedback pendiente">${escapeHtml(session?.blockers || '')}</textarea>
-          </label>
-          <label class="field">
-            <span>Resumen de cierre</span>
-            <textarea id="workEndSummary" rows="3" placeholder="Qué dejaste listo hoy y qué sigue mañana">${escapeHtml(session?.endSummary || '')}</textarea>
-          </label>
-          <button class="primary-button" type="submit">Guardar jornada</button>
-        </form>
-      </section>
-      <section class="panel">
-        <div class="panel-header">
-          <div>
-            <p class="eyebrow">Mi medición</p>
-            <h3 class="panel-title">Carga y entregas</h3>
-          </div>
-        </div>
-        <div class="stats-grid compact-grid">
-          <article class="stat-card"><p class="small-text">Tareas activas</p><div class="stat-value">${myMetrics.openTasks}</div></article>
-          <article class="stat-card"><p class="small-text">Subtareas abiertas</p><div class="stat-value">${myMetrics.openSubtasks}</div></article>
-          <article class="stat-card"><p class="small-text">Subtareas completadas</p><div class="stat-value">${myMetrics.completedSubtasks}</div></article>
-          <article class="stat-card"><p class="small-text">Tareas vencidas</p><div class="stat-value">${myMetrics.overdueTasks}</div></article>
-        </div>
-        <div class="activity-feed compact-feed">
-          ${myActivity.length ? myActivity.map((item) => `
-            <article class="activity-item">
-              <div class="activity-top">
-                <strong>${escapeHtml(item.label)}</strong>
-                <span class="small-text">${escapeHtml(formatDateTime(item.createdAt))}</span>
-              </div>
-              <div class="small-text">${escapeHtml(item.kind)}${item.entityType ? ` · ${escapeHtml(item.entityType)}` : ''}</div>
-            </article>
-          `).join('') : `<div class="empty-state">Aún no hay actividad registrada.</div>`}
-        </div>
-      </section>
+      ${renderWorkSessionPanel({ context: 'profile' })}
+      ${renderMyMeasurementPanel({ limit: 12 })}
     </div>
   `;
 
@@ -1212,7 +1238,16 @@ function renderProfile() {
     }
   });
 
-  document.getElementById('workSessionForm').addEventListener('submit', async (event) => {
+  bindWorkSessionControls();
+}
+
+function bindWorkSessionControls() {
+  const workSessionForm = document.getElementById('workSessionForm');
+  const checkInButton = document.getElementById('checkInButton');
+  const checkOutButton = document.getElementById('checkOutButton');
+  if (!workSessionForm || !checkInButton || !checkOutButton) return;
+
+  workSessionForm.addEventListener('submit', async (event) => {
     event.preventDefault();
     try {
       const result = await api('/api/work/session/today', {
@@ -1229,14 +1264,13 @@ function renderProfile() {
       if (index >= 0) state.workSessions[index] = result.session; else state.workSessions.unshift(result.session);
       showToast('Jornada guardada', 'Se actualizó tu control remoto del día.');
       await refreshBootstrap();
-      state.tab = 'profile';
       render();
     } catch (error) {
       showToast('Error', error.message, 'error');
     }
   });
 
-  document.getElementById('checkInButton').addEventListener('click', async () => {
+  checkInButton.addEventListener('click', async () => {
     try {
       const result = await api('/api/work/check-in', {
         method: 'POST',
@@ -1252,14 +1286,13 @@ function renderProfile() {
       if (index >= 0) state.workSessions[index] = result.session; else state.workSessions.unshift(result.session);
       showToast('Entrada registrada', 'Tu jornada remota ya inició.');
       await refreshBootstrap();
-      state.tab = 'profile';
       render();
     } catch (error) {
       showToast('Error', error.message, 'error');
     }
   });
 
-  document.getElementById('checkOutButton').addEventListener('click', async () => {
+  checkOutButton.addEventListener('click', async () => {
     try {
       const result = await api('/api/work/check-out', {
         method: 'POST',
@@ -1274,7 +1307,6 @@ function renderProfile() {
       if (index >= 0) state.workSessions[index] = result.session; else state.workSessions.unshift(result.session);
       showToast('Salida registrada', 'Tu jornada quedó cerrada.');
       await refreshBootstrap();
-      state.tab = 'profile';
       render();
     } catch (error) {
       showToast('Error', error.message, 'error');
