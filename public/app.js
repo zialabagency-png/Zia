@@ -49,7 +49,8 @@ const state = {
   authMode: 'login',
   tokenMode: '',
   tokenValue: '',
-  liveWorkSessionIds: {}
+  liveWorkSessionIds: {},
+  selectedCalendarDate: ''
 };
 
 const els = {
@@ -135,7 +136,7 @@ function isoDate(date) {
   return new Date(date).toISOString().slice(0, 10);
 }
 
-function zonedTodayKey() {
+function zonedTodayKey(dateLike = new Date()) {
   const timeZone = state.notificationSettings?.timezone || 'America/Santo_Domingo';
   try {
     const parts = new Intl.DateTimeFormat('en-CA', {
@@ -143,7 +144,7 @@ function zonedTodayKey() {
       year: 'numeric',
       month: '2-digit',
       day: '2-digit'
-    }).formatToParts(new Date());
+    }).formatToParts(new Date(dateLike));
     const year = parts.find((item) => item.type === 'year')?.value;
     const month = parts.find((item) => item.type === 'month')?.value;
     const day = parts.find((item) => item.type === 'day')?.value;
@@ -368,11 +369,14 @@ function getUserRemoteMetrics(userId) {
 }
 
 function getSessionWorkedLabel(session) {
-  if (!session?.checkInAt) return 'Sin entrada';
-  const start = new Date(session.checkInAt).getTime();
-  const end = session.checkOutAt ? new Date(session.checkOutAt).getTime() : Date.now();
-  const diff = Math.max(0, end - start);
-  const totalMinutes = Math.round(diff / 60000);
+  const accruedMinutes = Number(session?.accruedMinutes || 0);
+  if (!session?.checkInAt && !accruedMinutes) return 'Sin entrada';
+  let totalMinutes = accruedMinutes;
+  if (session?.checkInAt && !session?.checkOutAt) {
+    const start = new Date(session.checkInAt).getTime();
+    const diff = Math.max(0, Date.now() - start);
+    totalMinutes += Math.floor(diff / 60000);
+  }
   const hours = Math.floor(totalMinutes / 60);
   const minutes = totalMinutes % 60;
   return `${hours}h ${minutes.toString().padStart(2, '0')}m`;
@@ -575,6 +579,36 @@ function renderSubtaskPreview(task) {
       `).join('')}
       ${subtasks.length > 3 ? `<div class="small-text">+${subtasks.length - 3} subtareas más</div>` : ''}
     </div>
+  `;
+}
+
+
+function getChecklistSummary(task) {
+  const checklist = Array.isArray(task?.checklist) ? task.checklist : [];
+  const completed = checklist.filter((item) => item.done).length;
+  return { total: checklist.length, completed };
+}
+
+function renderChecklistPreview(task, { maxItems = 4, compact = false } = {}) {
+  const checklist = Array.isArray(task?.checklist) ? task.checklist : [];
+  if (!checklist.length) return '';
+  const summary = getChecklistSummary(task);
+  return `
+    <section class="task-checklist-block ${compact ? 'compact' : ''}">
+      <div class="task-section-head">
+        <strong>Checklist</strong>
+        <span class="task-section-meta">${summary.completed}/${summary.total}</span>
+      </div>
+      <div class="task-checklist-list ${compact ? 'compact' : ''}">
+        ${checklist.slice(0, maxItems).map((item) => `
+          <label class="task-checklist-item ${item.done ? 'done' : ''}">
+            <input type="checkbox" data-checklist-toggle="${task.id}" data-checklist-id="${item.id}" ${item.done ? 'checked' : ''} />
+            <span>${escapeHtml(item.text)}</span>
+          </label>
+        `).join('')}
+      </div>
+      ${checklist.length > maxItems ? `<div class="small-text">+${checklist.length - maxItems} objetivos más</div>` : ''}
+    </section>
   `;
 }
 
@@ -835,9 +869,9 @@ function renderTaskBoardHtml(tasks) {
 }
 
 function renderTaskCard(task) {
-  const checklistDone = (task.checklist || []).filter((item) => item.done).length;
-  const checklistTotal = (task.checklist || []).length;
+  const checklistSummary = getChecklistSummary(task);
   const subtaskSummary = getSubtaskSummary(task);
+  const resourceLinks = getTaskResourceLinks(task);
   return `
     <article class="task-card ${statusClass(task.status)}" draggable="true" data-task-id="${task.id}">
       <div class="task-card-header">
@@ -852,18 +886,21 @@ function renderTaskCard(task) {
         <div class="small-text">Responsables: ${escapeHtml(getTaskAssigneeNames(task))}</div>
       </div>
       <p class="task-description">${escapeHtml(task.description || 'Sin descripción')}</p>
-      <div class="task-meta-row">
-        <div class="small-text">${escapeHtml(task.type)} · ${escapeHtml(task.channel)}</div>
-        <div class="small-text">Entrega ${escapeHtml(formatDate(getTaskDueReference(task) || task.dueDate))}</div>
+      <div class="task-meta-row task-meta-grid">
+        <div class="task-meta-cell"><span class="small-text">Tipo</span><strong>${escapeHtml(task.type)}</strong></div>
+        <div class="task-meta-cell"><span class="small-text">Canal</span><strong>${escapeHtml(task.channel)}</strong></div>
+        <div class="task-meta-cell"><span class="small-text">Entrega</span><strong>${escapeHtml(formatDate(getTaskDueReference(task) || task.dueDate))}</strong></div>
+        <div class="task-meta-cell"><span class="small-text">Publicación</span><strong>${task.publishDate ? escapeHtml(formatDate(task.publishDate)) : '—'}</strong></div>
       </div>
       <div class="tags-row">
-        ${task.publishDate ? `<span class="task-chip">Publica ${escapeHtml(formatDate(task.publishDate))}</span>` : ''}
         ${task.approvalRequired ? '<span class="task-chip">Aprobación</span>' : ''}
-        ${checklistTotal ? `<span class="task-chip">Checklist ${checklistDone}/${checklistTotal}</span>` : ''}
+        ${checklistSummary.total ? `<span class="task-chip">Checklist ${checklistSummary.completed}/${checklistSummary.total}</span>` : ''}
         ${subtaskSummary.total ? `<span class="task-chip">Subtareas ${subtaskSummary.completed}/${subtaskSummary.total}</span>` : ''}
-        ${getTaskResourceLinks(task).length ? `<span class="task-chip">Enlaces ${getTaskResourceLinks(task).length}</span>` : ''}
+        ${resourceLinks.length ? `<span class="task-chip">Enlaces ${resourceLinks.length}</span>` : ''}
       </div>
+      ${renderChecklistPreview(task, { maxItems: 4 })}
       ${renderSubtaskPreview(task)}
+      ${resourceLinks.length ? `<div class="task-link-list">${resourceLinks.slice(0, 2).map((link) => `<a class="task-resource-link" href="${escapeHtml(link.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(link.label || link.provider || 'Abrir enlace')}</a>`).join('')}${resourceLinks.length > 2 ? `<span class="small-text">+${resourceLinks.length - 2} enlaces</span>` : ''}</div>` : ''}
       ${(task.labels || []).length ? `<div class="tags-row">${task.labels.map((label) => `<span class="badge">#${escapeHtml(label)}</span>`).join('')}</div>` : ''}
       <div class="task-card-footer">
         <label class="inline-status-wrap">
@@ -880,7 +917,7 @@ function renderTaskCard(task) {
 
 function renderTaskTableHtml(tasks) {
   return `
-    <section class="panel table-wrap">
+    <section class="panel table-wrap enhanced-table-wrap">
       <table class="data-table stacked-table">
         <thead>
           <tr>
@@ -897,18 +934,24 @@ function renderTaskTableHtml(tasks) {
         <tbody>
           ${tasks.length ? tasks.map((task) => {
             const subtaskSummary = getSubtaskSummary(task);
+            const checklistSummary = getChecklistSummary(task);
+            const resourceLinks = getTaskResourceLinks(task);
             return `
             <tr>
               <td data-label="Tarea">
-                <strong>${escapeHtml(task.title)}</strong>
-                <div class="table-subtext">${escapeHtml(task.type)} · ${escapeHtml(task.channel)} · ${escapeHtml(task.priority)}</div>
+                <div class="task-table-title-wrap">
+                  <strong>${escapeHtml(task.title)}</strong>
+                  <div class="table-subtext">${escapeHtml(task.type)} · ${escapeHtml(task.channel)} · ${escapeHtml(task.priority)}</div>
+                </div>
+                ${checklistSummary.total ? `<div class="task-table-check-meta">Checklist ${checklistSummary.completed}/${checklistSummary.total}</div>` : ''}
+                ${renderChecklistPreview(task, { maxItems: 2, compact: true })}
               </td>
               <td data-label="Cliente">${escapeHtml(getClientName(task.clientId))}</td>
               <td data-label="Responsables">${escapeHtml(getTaskAssigneeNames(task))}</td>
               <td data-label="Subtareas">${subtaskSummary.total ? `${subtaskSummary.completed}/${subtaskSummary.total}` : '—'}</td>
               <td data-label="Estado"><select class="inline-status-select ${statusClass(task.status)}" data-task-status-select="${task.id}">${renderStatusOptions(task.status)}</select></td>
               <td data-label="Entrega">${escapeHtml(formatDate(getTaskDueReference(task) || task.dueDate))}</td>
-              <td data-label="Enlaces">${getTaskResourceLinks(task).length}</td>
+              <td data-label="Enlaces">${resourceLinks.length}</td>
               <td data-label="Acciones">
                 <div class="table-actions">
                   <button class="text-button" data-edit-task="${task.id}">Editar</button>
@@ -929,12 +972,13 @@ function renderCalendar() {
   const gridStart = new Date(firstDay);
   gridStart.setDate(firstDay.getDate() - startOffset);
   const days = [];
+  const selectedDate = state.selectedCalendarDate || '';
   for (let index = 0; index < 42; index += 1) {
     const date = new Date(gridStart);
     date.setDate(gridStart.getDate() + index);
     const key = isoDate(date);
     const items = getFilteredTasks().filter((task) => task.publishDate === key || task.dueDate === key);
-    days.push({ date, key, items, isCurrentMonth: date.getMonth() === cursor.getMonth() });
+    days.push({ date, key, items, isCurrentMonth: date.getMonth() === cursor.getMonth(), isSelected: selectedDate === key });
   }
   const monthLabel = new Intl.DateTimeFormat('es-DO', { month: 'long', year: 'numeric' }).format(cursor);
 
@@ -944,9 +988,11 @@ function renderCalendar() {
         <div>
           <p class="eyebrow">Calendario editorial</p>
           <h3 class="panel-title">${escapeHtml(monthLabel)}</h3>
+          <p class="small-text">${selectedDate ? `Fecha seleccionada: ${escapeHtml(formatDate(selectedDate))}` : 'Selecciona un día para crear o revisar tareas.'}</p>
         </div>
-        <div class="table-actions">
+        <div class="table-actions wrap-actions">
           <button class="ghost-button" id="prevMonthButton">← Mes anterior</button>
+          ${isAdmin() ? `<button class="primary-button" id="createTaskFromCalendarButton" ${selectedDate ? '' : 'disabled'}>Nueva tarea ${selectedDate ? escapeHtml(formatDate(selectedDate)) : ''}</button>` : ''}
           <button class="ghost-button" id="nextMonthButton">Mes siguiente →</button>
         </div>
       </div>
@@ -954,9 +1000,15 @@ function renderCalendar() {
         <div class="calendar-grid">
           ${['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'].map((day) => `<div class="small-text calendar-weekday">${day}</div>`).join('')}
           ${days.map((day) => `
-            <div class="calendar-day ${day.isCurrentMonth ? '' : 'muted'}">
-              <strong>${day.date.getDate()}</strong>
-              ${day.items.slice(0, 3).map((task) => `<div class="calendar-item" data-edit-task="${task.id}">${escapeHtml(task.title)}</div>`).join('')}
+            <div class="calendar-day ${day.isCurrentMonth ? '' : 'muted'} ${day.isSelected ? 'selected' : ''}" data-calendar-date="${day.key}">
+              <div class="calendar-day-top">
+                <strong>${day.date.getDate()}</strong>
+                ${isAdmin() ? `<button type="button" class="calendar-add-button" data-create-task-date="${day.key}" aria-label="Crear tarea para ${day.key}">＋</button>` : ''}
+              </div>
+              <div class="calendar-day-items">
+                ${day.items.slice(0, 4).map((task) => `<div class="calendar-item ${statusClass(task.status)}" data-edit-task="${task.id}">${escapeHtml(task.title)}</div>`).join('')}
+                ${day.items.length > 4 ? `<div class="small-text">+${day.items.length - 4} tareas</div>` : ''}
+              </div>
             </div>
           `).join('')}
         </div>
@@ -974,6 +1026,21 @@ function renderCalendar() {
     renderCalendar();
     bindDynamicActions();
   });
+  document.querySelectorAll('[data-calendar-date]').forEach((dayNode) => {
+    dayNode.addEventListener('click', (event) => {
+      if (event.target.closest('[data-edit-task]') || event.target.closest('[data-create-task-date]')) return;
+      state.selectedCalendarDate = dayNode.dataset.calendarDate;
+      renderCalendar();
+      bindDynamicActions();
+    });
+  });
+  const createTaskButton = document.getElementById('createTaskFromCalendarButton');
+  if (createTaskButton) {
+    createTaskButton.addEventListener('click', () => {
+      if (!state.selectedCalendarDate) return;
+      openTaskModal('', { dueDate: state.selectedCalendarDate, publishDate: state.selectedCalendarDate, fromCalendar: true });
+    });
+  }
 }
 
 function renderClients() {
@@ -1456,7 +1523,7 @@ function bindWorkSessionControls() {
   });
 }
 
-function openTaskModal(taskId = '') {
+function openTaskModal(taskId = '', preset = {}) {
   const task = state.tasks.find((item) => item.id === taskId);
   els.taskModalTitle.textContent = task ? 'Editar tarea' : 'Nueva tarea';
   els.deleteTaskButton.classList.toggle('hidden', !task);
@@ -1470,8 +1537,8 @@ function openTaskModal(taskId = '') {
   document.getElementById('taskAssigneesBox').innerHTML = renderAssigneeCheckboxes(getTaskAssigneeIds(task || {}));
   document.getElementById('taskPriority').value = task?.priority || 'Media';
   document.getElementById('taskStatus').value = task?.status || 'not_started';
-  document.getElementById('taskDueDate').value = task?.dueDate || '';
-  document.getElementById('taskPublishDate').value = task?.publishDate || '';
+  document.getElementById('taskDueDate').value = task?.dueDate || preset.dueDate || '';
+  document.getElementById('taskPublishDate').value = task?.publishDate || preset.publishDate || '';
   document.getElementById('taskApproval').checked = Boolean(task?.approvalRequired);
   document.getElementById('taskLabels').value = (task?.labels || []).join(', ');
   if (!task && !isAdmin()) {
@@ -1721,6 +1788,34 @@ function bindDynamicActions() {
       } catch (error) {
         showToast('Error', error.message, 'error');
       }
+    });
+  });
+
+  document.querySelectorAll('[data-checklist-toggle]').forEach((checkbox) => {
+    checkbox.addEventListener('change', async () => {
+      const task = state.tasks.find((item) => item.id === checkbox.dataset.checklistToggle);
+      if (!task) return;
+      const updatedChecklist = (task.checklist || []).map((item) => item.id === checkbox.dataset.checklistId ? { ...item, done: checkbox.checked } : item);
+      try {
+        const updated = await api(`/api/tasks/${task.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ...task, checklist: updatedChecklist })
+        });
+        state.tasks = state.tasks.map((item) => item.id === updated.id ? updated : item);
+        render();
+        bindDynamicActions();
+      } catch (error) {
+        checkbox.checked = !checkbox.checked;
+        showToast('Error', error.message, 'error');
+      }
+    });
+  });
+  document.querySelectorAll('[data-create-task-date]').forEach((button) => {
+    button.addEventListener('click', (event) => {
+      event.stopPropagation();
+      state.selectedCalendarDate = button.dataset.createTaskDate;
+      openTaskModal('', { dueDate: button.dataset.createTaskDate, publishDate: button.dataset.createTaskDate, fromCalendar: true });
     });
   });
   document.querySelectorAll('[data-edit-client]').forEach((button) => {
@@ -2015,7 +2110,10 @@ function bindStaticEvents() {
     scrollCurrentViewToTop();
   });
 
-  els.newTaskButton.addEventListener('click', () => openTaskModal());
+  els.newTaskButton.addEventListener('click', () => {
+    if (state.tab === 'calendar' && state.selectedCalendarDate) openTaskModal('', { dueDate: state.selectedCalendarDate, publishDate: state.selectedCalendarDate, fromCalendar: true });
+    else openTaskModal();
+  });
   document.getElementById('addSubtaskButton').addEventListener('click', () => addSubtaskRow());
   document.getElementById('taskLinks').addEventListener('input', (event) => {
     renderTaskResourceLinks({ resourceLinks: parseResourceLinks(event.target.value) });

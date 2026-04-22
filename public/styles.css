@@ -2823,3 +2823,201 @@ body.drawer-open {
   .compact-actions { justify-content:stretch; }
   .compact-actions > * { width:100%; }
 }
+
+
+/* ---- Task experience polish ---- */
+.task-card {
+  gap: 0.95rem;
+}
+.task-meta-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.7rem;
+}
+.task-meta-cell {
+  padding: 0.75rem 0.85rem;
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 16px;
+  background: rgba(255,255,255,0.02);
+}
+.task-meta-cell strong {
+  display: block;
+  margin-top: 0.15rem;
+  font-size: 0.98rem;
+}
+.task-checklist-block {
+  border: 1px solid rgba(255,255,255,0.07);
+  border-radius: 18px;
+  background: rgba(255,255,255,0.02);
+  padding: 0.8rem 0.9rem;
+}
+.task-checklist-block.compact {
+  margin-top: 0.55rem;
+  padding: 0.6rem 0.7rem;
+  border-radius: 14px;
+}
+.task-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.5rem;
+}
+.task-section-meta {
+  color: var(--muted);
+  font-size: 0.84rem;
+}
+.task-checklist-list {
+  display: grid;
+  gap: 0.45rem;
+}
+.task-checklist-list.compact {
+  gap: 0.38rem;
+}
+.task-checklist-item {
+  display: flex;
+  gap: 0.65rem;
+  align-items: flex-start;
+  font-size: 0.92rem;
+  line-height: 1.35;
+  color: var(--text-soft);
+  cursor: pointer;
+}
+.task-checklist-item input {
+  margin-top: 0.15rem;
+  accent-color: var(--accent);
+  width: 1rem;
+  height: 1rem;
+}
+.task-checklist-item.done span {
+  text-decoration: line-through;
+  color: rgba(255,255,255,0.48);
+}
+.task-link-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.task-resource-link {
+  padding: 0.48rem 0.78rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255,143,31,0.22);
+  color: #ffd8ad;
+  text-decoration: none;
+  background: rgba(255,143,31,0.08);
+  font-size: 0.86rem;
+}
+.task-resource-link:hover {
+  background: rgba(255,143,31,0.14);
+}
+.task-table-check-meta {
+  margin-top: 0.35rem;
+  color: var(--muted);
+  font-size: 0.84rem;
+}
+.task-table-title-wrap strong {
+  display: block;
+  margin-bottom: 0.15rem;
+}
+.enhanced-table-wrap .task-checklist-block.compact {
+  background: rgba(255,255,255,0.015);
+}
+
+/* ---- Calendar polish ---- */
+.calendar-day.selected {
+  border-color: rgba(255,143,31,0.35);
+  box-shadow: 0 0 0 1px rgba(255,143,31,0.2), 0 18px 38px rgba(0,0,0,0.28);
+}
+.calendar-day-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.6rem;
+}
+.calendar-day-items {
+  display: grid;
+  gap: 0.45rem;
+}
+.calendar-add-button {
+  width: 1.65rem;
+  height: 1.65rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,0.12);
+  background: rgba(255,255,255,0.04);
+  color: var(--text);
+  cursor: pointer;
+  font-size: 1rem;
+  line-height: 1;
+}
+.calendar-add-button:hover {
+  border-color: rgba(255,143,31,0.32);
+  color: #ffd8ad;
+}
+.calendar-item.status-not_started,
+.calendar-item.status-in_progress,
+.calendar-item.status-review,
+.calendar-item.status-sent,
+.calendar-item.status-approved,
+.calendar-item.status-scheduled {
+  border-left: 2px solid rgba(255,255,255,0.16);
+}
+.calendar-item.status-not_started { border-left-color: rgba(255,255,255,0.34); }
+.calendar-item.status-in_progress { border-left-color: rgba(79,135,255,0.82); }
+.calendar-item.status-review { border-left-color: rgba(255,199,85,0.88); }
+.calendar-item.status-sent { border-left-color: rgba(176,124,255,0.9); }
+.calendar-item.status-approved { border-left-color: rgba(70,214,152,0.92); }
+.calendar-item.status-scheduled { border-left-color: rgba(255,143,31,0.9); }
+
+/* ---- Remote session polish ---- */
+.work-session-stats .stat-card {
+  min-height: 145px;
+}
+.work-duration-card .stat-value,
+.work-status-card .stat-value,
+.work-time-card .stat-value {
+  font-size: clamp(1.15rem, 1.8vw, 2.1rem);
+  line-height: 1.08;
+  word-break: break-word;
+}
+.work-status-card {
+  transition: border-color .2s ease, background .2s ease, box-shadow .2s ease;
+}
+.work-status-card.work-available { background: rgba(70,214,152,0.08); border-color: rgba(70,214,152,0.28); }
+.work-status-card.work-focus { background: rgba(79,135,255,0.08); border-color: rgba(79,135,255,0.28); }
+.work-status-card.work-meeting { background: rgba(255,199,85,0.08); border-color: rgba(255,199,85,0.28); }
+.work-status-card.work-break { background: rgba(255,143,31,0.08); border-color: rgba(255,143,31,0.28); }
+.work-status-card.work-offline { background: rgba(255,255,255,0.03); border-color: rgba(255,255,255,0.12); }
+
+@media (max-width: 1220px) {
+  .task-meta-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+@media (max-width: 980px) {
+  .task-meta-grid {
+    grid-template-columns: 1fr;
+  }
+  .calendar-head .table-actions {
+    width: 100%;
+  }
+  .calendar-head .table-actions > * {
+    flex: 1 1 100%;
+  }
+}
+@media (max-width: 720px) {
+  .task-checklist-item {
+    font-size: 0.88rem;
+  }
+  .calendar-day-top {
+    margin-bottom: 0.4rem;
+  }
+  .work-session-stats .stat-card {
+    min-height: 118px;
+  }
+  .work-duration-card .stat-value,
+  .work-status-card .stat-value,
+  .work-time-card .stat-value {
+    font-size: 1.55rem;
+  }
+}
