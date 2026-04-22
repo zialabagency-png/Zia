@@ -353,15 +353,15 @@ function renderWorkSessionPanel({ context = 'profile' } = {}) {
         </div>
       </div>
       <div class="stats-grid work-session-stats ${isDashboard ? 'dashboard-work-stats' : 'profile-work-stats'}">
-        <article class="stat-card stat-card-wide"><p class="small-text">Entrada</p><div class="stat-value small-value">${escapeHtml(formatDateTime(session?.checkInAt))}</div></article>
-        <article class="stat-card stat-card-wide"><p class="small-text">Salida</p><div class="stat-value small-value">${escapeHtml(formatDateTime(session?.checkOutAt))}</div></article>
-        <article class="stat-card"><p class="small-text">Tiempo</p><div class="stat-value small-value">${escapeHtml(getSessionWorkedLabel(session))}</div></article>
-        <article class="stat-card"><p class="small-text">Estado</p><div class="stat-value small-value">${escapeHtml(workStatusLabel(statusKey))}</div></article>
+        <article class="stat-card stat-card-wide work-stat-card work-time-card"><p class="small-text">Entrada</p><div class="stat-value small-value">${escapeHtml(formatDateTime(session?.checkInAt))}</div></article>
+        <article class="stat-card stat-card-wide work-stat-card work-time-card"><p class="small-text">Salida</p><div class="stat-value small-value">${escapeHtml(formatDateTime(session?.checkOutAt))}</div></article>
+        <article class="stat-card work-stat-card work-duration-card"><p class="small-text">Tiempo</p><div class="stat-value small-value">${escapeHtml(getSessionWorkedLabel(session))}</div></article>
+        <article class="stat-card work-stat-card work-status-card ${workStatusClass(statusKey)}"><p class="small-text">Estado</p><div class="stat-value small-value">${escapeHtml(workStatusLabel(statusKey))}</div></article>
       </div>
       <form class="stack-form work-session-form ${isDashboard ? 'work-session-form-inline' : ''}" id="workSessionForm">
         <label class="field work-field-status">
           <span>Estado actual</span>
-          <select id="workStatus">${renderWorkStatusOptions(statusKey)}</select>
+          <select id="workStatus" class="work-status-select ${workStatusClass(statusKey)}">${renderWorkStatusOptions(statusKey)}</select>
         </label>
         <label class="field work-field-plan ${isDashboard ? 'field-span-2' : ''}">
           <span>Plan del día</span>
@@ -1241,11 +1241,23 @@ function renderProfile() {
   bindWorkSessionControls();
 }
 
+function syncWorkStatusVisuals() {
+  const select = document.getElementById('workStatus');
+  if (!select) return;
+  const statusClasses = WORK_STATUS_CONFIG.map((item) => workStatusClass(item.key));
+  select.classList.remove(...statusClasses);
+  select.classList.add('work-status-select', workStatusClass(select.value || 'available'));
+}
+
 function bindWorkSessionControls() {
   const workSessionForm = document.getElementById('workSessionForm');
   const checkInButton = document.getElementById('checkInButton');
   const checkOutButton = document.getElementById('checkOutButton');
+  const workStatusSelect = document.getElementById('workStatus');
   if (!workSessionForm || !checkInButton || !checkOutButton) return;
+
+  syncWorkStatusVisuals();
+  workStatusSelect?.addEventListener('change', syncWorkStatusVisuals);
 
   workSessionForm.addEventListener('submit', async (event) => {
     event.preventDefault();

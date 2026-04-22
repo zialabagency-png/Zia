@@ -2165,3 +2165,181 @@ body,
     min-height: 108px;
   }
 }
+
+
+/* 2026-04-22 work status color system + remote visual polish */
+.work-available {
+  --stage-bg: rgba(43, 196, 122, 0.14);
+  --stage-border: rgba(43, 196, 122, 0.34);
+  --stage-text: #bdf4d3;
+}
+
+.work-focus {
+  --stage-bg: rgba(77, 139, 255, 0.14);
+  --stage-border: rgba(77, 139, 255, 0.34);
+  --stage-text: #c6dcff;
+}
+
+.work-meeting {
+  --stage-bg: rgba(243, 181, 63, 0.15);
+  --stage-border: rgba(243, 181, 63, 0.34);
+  --stage-text: #ffe1a2;
+}
+
+.work-break {
+  --stage-bg: rgba(255, 107, 0, 0.15);
+  --stage-border: rgba(255, 107, 0, 0.34);
+  --stage-text: #ffd0ab;
+}
+
+.work-offline {
+  --stage-bg: rgba(138, 149, 168, 0.12);
+  --stage-border: rgba(138, 149, 168, 0.28);
+  --stage-text: #d8dfea;
+}
+
+.work-status-card,
+.work-status-select,
+.remote-control-panel .badge,
+.remote-summary-panel .badge {
+  background: var(--stage-bg, rgba(255,255,255,0.04));
+  border-color: var(--stage-border, var(--line));
+  color: var(--stage-text, var(--text));
+}
+
+.work-status-card {
+  box-shadow: inset 0 1px 0 var(--stage-border, transparent);
+}
+
+.work-status-card .small-text,
+.work-status-card .stat-value {
+  color: var(--stage-text, var(--text));
+}
+
+.work-status-select {
+  border-width: 1px;
+  box-shadow: 0 0 0 1px rgba(255,255,255,0.02);
+}
+
+.work-status-select:focus {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--stage-border, rgba(255,255,255,0.18)) 45%, transparent);
+}
+
+.remote-control-panel .badge {
+  font-weight: 700;
+}
+
+.work-session-stats {
+  grid-template-columns: repeat(4, minmax(110px, 1fr));
+  gap: 12px;
+}
+
+.dashboard-work-stats .stat-card,
+.profile-work-stats .stat-card {
+  min-height: 126px;
+  padding: 18px 18px 16px;
+}
+
+.work-stat-card .small-text {
+  font-size: 0.88rem;
+  margin-bottom: 8px;
+}
+
+.work-session-stats .stat-value.small-value {
+  font-size: clamp(1rem, 1.45vw, 1.75rem);
+  line-height: 1.14;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+}
+
+.work-time-card .stat-value.small-value {
+  font-size: clamp(0.98rem, 1.18vw, 1.45rem);
+}
+
+.work-duration-card .stat-value.small-value,
+.work-status-card .stat-value.small-value {
+  font-size: clamp(1.18rem, 1.2vw, 1.55rem);
+}
+
+.remote-dashboard-panel .panel-header-spread {
+  gap: 12px;
+}
+
+.remote-actions {
+  gap: 10px;
+  align-items: center;
+}
+
+.remote-actions .ghost-button {
+  padding: 14px 20px;
+}
+
+.remote-metrics-grid .stat-card {
+  min-height: 118px;
+}
+
+.remote-metrics-grid .stat-value {
+  font-size: clamp(1.3rem, 1.7vw, 2rem);
+}
+
+.remote-summary-panel .activity-feed {
+  gap: 12px;
+}
+
+.remote-activity-feed .activity-item {
+  border-radius: 22px;
+  background: rgba(255,255,255,0.02);
+  border: 1px solid rgba(255,255,255,0.06);
+}
+
+@media (max-width: 1460px) {
+  .work-session-stats .stat-value.small-value {
+    font-size: clamp(0.98rem, 1.2vw, 1.55rem);
+  }
+}
+
+@media (max-width: 1200px) {
+  .work-session-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .work-time-card .stat-value.small-value,
+  .work-duration-card .stat-value.small-value,
+  .work-status-card .stat-value.small-value {
+    font-size: clamp(1.1rem, 1.7vw, 1.5rem);
+  }
+}
+
+@media (max-width: 980px) {
+  .remote-actions {
+    width: 100%;
+    justify-content: stretch;
+  }
+
+  .remote-actions > * {
+    width: 100%;
+  }
+
+  .work-session-stats .stat-value.small-value {
+    font-size: clamp(1rem, 4vw, 1.55rem);
+  }
+}
+
+@media (max-width: 720px) {
+  .dashboard-work-stats .stat-card,
+  .profile-work-stats .stat-card,
+  .remote-metrics-grid .stat-card {
+    min-height: 104px;
+    padding: 16px 15px;
+  }
+
+  .work-session-stats .stat-value.small-value {
+    font-size: clamp(0.95rem, 5vw, 1.35rem);
+  }
+
+  .work-time-card .stat-value.small-value,
+  .work-duration-card .stat-value.small-value,
+  .work-status-card .stat-value.small-value {
+    font-size: clamp(1rem, 5vw, 1.4rem);
+  }
+}
