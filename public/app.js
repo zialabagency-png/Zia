@@ -90,9 +90,11 @@ const els = {
   taskModalBackdrop: document.getElementById('taskModalBackdrop'),
   clientModalBackdrop: document.getElementById('clientModalBackdrop'),
   userModalBackdrop: document.getElementById('userModalBackdrop'),
+  workdayCheckoutModalBackdrop: document.getElementById('workdayCheckoutModalBackdrop'),
   taskForm: document.getElementById('taskForm'),
   clientForm: document.getElementById('clientForm'),
   userForm: document.getElementById('userForm'),
+  workdayCheckoutForm: document.getElementById('workdayCheckoutForm'),
   taskModalTitle: document.getElementById('taskModalTitle'),
   clientModalTitle: document.getElementById('clientModalTitle'),
   userModalTitle: document.getElementById('userModalTitle'),
@@ -572,12 +574,12 @@ function renderWorkSessionPanel({ context = 'profile' } = {}) {
         <div>
           <p class="eyebrow">Jornada remota</p>
           <h3 class="panel-title">Mi control de trabajo</h3>
-          <p class="small-text">Marca entrada para iniciar en Disponible. Para cerrar jornada, completa los campos obligatorios y luego marca salida.</p>
+          <p class="small-text">Marca entrada para iniciar en Disponible. Para cerrar jornada, usa <strong>Terminar jornada</strong> y completa el cierre obligatorio en el modal.</p>
         </div>
         <div class="table-actions wrap-actions remote-actions">
           <span class="badge stage-badge ${workStatusClass(statusKey)}">${escapeHtml(workStatusLabel(statusKey))}</span>
           <button class="ghost-button" type="button" id="checkInButton" data-work-checkin ${openSession ? 'disabled' : ''}>Marcar entrada</button>
-          <button class="ghost-button" type="button" id="checkOutButton" data-work-checkout ${!openSession ? 'disabled' : ''}>Marcar salida</button>
+          <button class="ghost-button" type="button" id="checkOutButton" data-work-checkout ${!openSession ? 'disabled' : ''}>Terminar jornada</button>
         </div>
       </div>
       <div class="stats-grid work-session-stats ${isDashboard ? 'dashboard-work-stats' : 'profile-work-stats'}">
@@ -586,25 +588,19 @@ function renderWorkSessionPanel({ context = 'profile' } = {}) {
         <article class="stat-card work-stat-card work-duration-card"><p class="small-text">Tiempo</p><div class="stat-value small-value" data-work-duration>${escapeHtml(getSessionWorkedLabel(session))}</div></article>
         <article class="stat-card work-stat-card work-status-card ${workStatusClass(statusKey)}" data-work-status-card><p class="small-text">Estado</p><div class="stat-value small-value" data-work-status-label>${escapeHtml(workStatusLabel(statusKey))}</div></article>
       </div>
-      <form class="stack-form work-session-form ${isDashboard ? 'work-session-form-inline' : ''}" id="workSessionForm">
+      <form class="stack-form work-session-form ${isDashboard ? 'work-session-form-inline work-session-form-minimal' : 'work-session-form-minimal'}" id="workSessionForm">
         <label class="field work-field-status">
           <span>Estado actual</span>
           <select id="workStatus" class="work-status-select ${workStatusClass(statusKey)}">${renderWorkStatusOptions(statusKey)}</select>
         </label>
-        <label class="field work-field-plan ${isDashboard ? 'field-span-2' : ''}">
-          <span>Plan del día <small class="required-hint">obligatorio al salir</small></span>
-          <textarea id="workFocusPlan" rows="${isDashboard ? '2' : '3'}" placeholder="Ej: calendario de Eves Dental, captions y revisión de reels">${escapeHtml(session?.focusPlan || '')}</textarea>
-        </label>
-        <label class="field work-field-blockers ${isDashboard ? 'field-span-2' : ''}">
-          <span>Bloqueos o necesidades <small class="required-hint">obligatorio al salir</small></span>
-          <textarea id="workBlockers" rows="2" placeholder="Ej: esperando aprobación, falta material, feedback pendiente">${escapeHtml(session?.blockers || '')}</textarea>
-        </label>
-        <label class="field work-field-summary ${isDashboard ? 'field-span-2' : ''}">
-          <span>Resumen de cierre <small class="required-hint">obligatorio al salir</small></span>
-          <textarea id="workEndSummary" rows="${isDashboard ? '2' : '3'}" placeholder="Qué dejaste listo hoy y qué sigue mañana">${escapeHtml(session?.endSummary || '')}</textarea>
-        </label>
+        <div class="workday-closure-hint ${isDashboard ? 'field-span-2' : ''}">
+          <div class="workday-closure-copy">
+            <strong>Cierre obligatorio al salir</strong>
+            <span class="small-text">Al terminar jornada se abrirá un modal para registrar avance, bloqueos y resumen del día.</span>
+          </div>
+        </div>
         <div class="work-form-footer ${isDashboard ? 'field-span-2' : ''}">
-          <button class="primary-button" type="submit">Guardar jornada</button>
+          <button class="primary-button" type="submit">Guardar estado</button>
         </div>
       </form>
     </section>
@@ -1746,18 +1742,27 @@ function pinLiveWorkSession(session) {
 
 function getCheckoutRequiredFields() {
   return [
-    { id: 'workFocusPlan', label: 'Plan del día' },
-    { id: 'workBlockers', label: 'Bloqueos o necesidades' },
-    { id: 'workEndSummary', label: 'Resumen de cierre' }
+    { id: 'workdayCheckoutFocusPlan', wrapperId: 'workdayFocusPlanField', label: 'Plan del día' },
+    { id: 'workdayCheckoutBlockers', wrapperId: 'workdayBlockersField', label: 'Bloqueos o necesidades' },
+    { id: 'workdayCheckoutEndSummary', wrapperId: 'workdayEndSummaryField', label: 'Resumen de cierre' }
   ];
 }
 
 function clearCheckoutFieldErrors() {
   getCheckoutRequiredFields().forEach((field) => {
-    const input = document.getElementById(field.id);
-    const wrapper = input?.closest('.field');
+    const wrapper = document.getElementById(field.wrapperId);
     wrapper?.classList.remove('field-error');
   });
+}
+
+function populateCheckoutModalFields() {
+  const session = getTodaySession(state.currentUser?.id);
+  const focus = document.getElementById('workdayCheckoutFocusPlan');
+  const blockers = document.getElementById('workdayCheckoutBlockers');
+  const summary = document.getElementById('workdayCheckoutEndSummary');
+  if (focus) focus.value = session?.focusPlan || '';
+  if (blockers) blockers.value = session?.blockers || '';
+  if (summary) summary.value = session?.endSummary || '';
 }
 
 function validateCheckoutFields() {
@@ -1765,15 +1770,26 @@ function validateCheckoutFields() {
   const missing = getCheckoutRequiredFields().filter((field) => {
     const input = document.getElementById(field.id);
     const empty = !String(input?.value || '').trim();
-    if (empty) input?.closest('.field')?.classList.add('field-error');
+    if (empty) document.getElementById(field.wrapperId)?.classList.add('field-error');
     return empty;
   });
   if (missing.length) {
     const first = document.getElementById(missing[0].id);
     first?.focus();
-    first?.scrollIntoView({ block: 'center', behavior: 'smooth' });
     throw new Error(`Completa estos campos para cerrar tu jornada: ${missing.map((field) => field.label).join(', ')}.`);
   }
+}
+
+function openWorkdayCheckoutModal() {
+  clearCheckoutFieldErrors();
+  populateCheckoutModalFields();
+  els.workdayCheckoutModalBackdrop?.classList.remove('hidden');
+}
+
+function closeWorkdayCheckoutModal() {
+  clearCheckoutFieldErrors();
+  els.workdayCheckoutForm?.reset();
+  els.workdayCheckoutModalBackdrop?.classList.add('hidden');
 }
 
 
@@ -1791,17 +1807,15 @@ function bindWorkSessionControls() {
   workSessionForm.addEventListener('submit', async (event) => {
     event.preventDefault();
     try {
-      const focusPlan = document.getElementById('workFocusPlan').value.trim();
-      const blockers = document.getElementById('workBlockers').value.trim();
-      const endSummary = document.getElementById('workEndSummary').value.trim();
+      const session = getTodaySession(state.currentUser?.id);
       const result = await api('/api/work/session/today', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           status: document.getElementById('workStatus').value,
-          focusPlan,
-          blockers,
-          endSummary
+          focusPlan: session?.focusPlan || '',
+          blockers: session?.blockers || '',
+          endSummary: session?.endSummary || ''
         })
       });
       const index = state.workSessions.findIndex((item) => item.id === result.session.id || (item.userId === result.session.userId && item.dateKey === result.session.dateKey));
@@ -1820,17 +1834,15 @@ function bindWorkSessionControls() {
   checkInButton.addEventListener('click', async () => {
     try {
       clearCheckoutFieldErrors();
-      const focusPlan = document.getElementById('workFocusPlan').value.trim();
-      const blockers = document.getElementById('workBlockers').value.trim();
-      const endSummary = document.getElementById('workEndSummary').value.trim();
+      const session = getTodaySession(state.currentUser?.id);
       const result = await api('/api/work/check-in', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           status: 'available',
-          focusPlan,
-          blockers,
-          endSummary
+          focusPlan: session?.focusPlan || '',
+          blockers: session?.blockers || '',
+          endSummary: session?.endSummary || ''
         })
       });
       const index = state.workSessions.findIndex((item) => item.id === result.session.id || (item.userId === result.session.userId && item.dateKey === result.session.dateKey));
@@ -1846,34 +1858,43 @@ function bindWorkSessionControls() {
     }
   });
 
-  checkOutButton.addEventListener('click', async () => {
-    try {
-      validateCheckoutFields();
-      const focusPlan = document.getElementById('workFocusPlan').value.trim();
-      const blockers = document.getElementById('workBlockers').value.trim();
-      const endSummary = document.getElementById('workEndSummary').value.trim();
-      const result = await api('/api/work/check-out', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          status: 'offline',
-          focusPlan,
-          blockers,
-          endSummary
-        })
-      });
-      const index = state.workSessions.findIndex((item) => item.id === result.session.id || (item.userId === result.session.userId && item.dateKey === result.session.dateKey));
-      if (index >= 0) state.workSessions[index] = result.session; else state.workSessions.unshift(result.session);
-      pinLiveWorkSession(result.session);
-      updateWorkSessionPanelVisuals();
-      startWorkSessionTicker();
-      showToast('Salida registrada', 'Tu jornada quedó cerrada.');
-      await refreshBootstrap();
-      render();
-    } catch (error) {
-      showToast('Error', error.message, 'error');
-    }
+  checkOutButton.addEventListener('click', () => {
+    openWorkdayCheckoutModal();
   });
+
+  if (els.workdayCheckoutForm && !els.workdayCheckoutForm.dataset.bound) {
+    els.workdayCheckoutForm.dataset.bound = '1';
+    els.workdayCheckoutForm.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      try {
+        validateCheckoutFields();
+        const focusPlan = document.getElementById('workdayCheckoutFocusPlan').value.trim();
+        const blockers = document.getElementById('workdayCheckoutBlockers').value.trim();
+        const endSummary = document.getElementById('workdayCheckoutEndSummary').value.trim();
+        const result = await api('/api/work/check-out', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            status: 'offline',
+            focusPlan,
+            blockers,
+            endSummary
+          })
+        });
+        const index = state.workSessions.findIndex((item) => item.id === result.session.id || (item.userId === result.session.userId && item.dateKey === result.session.dateKey));
+        if (index >= 0) state.workSessions[index] = result.session; else state.workSessions.unshift(result.session);
+        pinLiveWorkSession(result.session);
+        closeWorkdayCheckoutModal();
+        updateWorkSessionPanelVisuals();
+        startWorkSessionTicker();
+        showToast('Salida registrada', 'Tu jornada quedó cerrada.');
+        await refreshBootstrap();
+        render();
+      } catch (error) {
+        showToast('Error', error.message, 'error');
+      }
+    });
+  }
 }
 
 function openTaskModal(taskId = '', preset = {}) {
@@ -2408,6 +2429,7 @@ function closeAllModals() {
   closeTaskModal();
   closeClientModal();
   closeUserModal();
+  closeWorkdayCheckoutModal();
 }
 
 function bindStaticEvents() {
@@ -2545,8 +2567,8 @@ function bindStaticEvents() {
   document.querySelectorAll('[data-close-modal]').forEach((button) => {
     button.addEventListener('click', closeAllModals);
   });
-  [els.taskModalBackdrop, els.clientModalBackdrop, els.userModalBackdrop].forEach((backdrop) => {
-    backdrop.addEventListener('click', (event) => {
+  [els.taskModalBackdrop, els.clientModalBackdrop, els.userModalBackdrop, els.workdayCheckoutModalBackdrop].forEach((backdrop) => {
+    backdrop?.addEventListener('click', (event) => {
       if (event.target === backdrop) closeAllModals();
     });
   });

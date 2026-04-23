@@ -394,6 +394,42 @@ https://docs.google.com/..."></textarea>
       </div>
     </div>
 
+
+    <div class="modal-backdrop hidden" id="workdayCheckoutModalBackdrop">
+      <div class="modal-card modal-medium checkout-modal-card">
+        <div class="modal-header">
+          <div>
+            <p class="eyebrow">Jornada remota</p>
+            <h3>Terminar jornada</h3>
+            <p class="small-text">Completa este cierre para registrar lo que avanzaste hoy antes de salir.</p>
+          </div>
+          <button class="close-button" data-close-modal="workday-checkout">✕</button>
+        </div>
+        <form class="stack-form" id="workdayCheckoutForm">
+          <div class="form-grid one-column checkout-modal-grid">
+            <label class="field" id="workdayFocusPlanField">
+              <span>Plan del día <small class="required-hint">obligatorio</small></span>
+              <textarea id="workdayCheckoutFocusPlan" rows="4" placeholder="Qué trabajaste hoy, piezas, clientes o entregables"></textarea>
+            </label>
+            <label class="field" id="workdayBlockersField">
+              <span>Bloqueos o necesidades <small class="required-hint">obligatorio</small></span>
+              <textarea id="workdayCheckoutBlockers" rows="3" placeholder="Aprobaciones pendientes, material faltante, feedback o cualquier bloqueo"></textarea>
+            </label>
+            <label class="field" id="workdayEndSummaryField">
+              <span>Resumen de cierre <small class="required-hint">obligatorio</small></span>
+              <textarea id="workdayCheckoutEndSummary" rows="4" placeholder="Qué dejaste listo hoy y qué sigue mañana"></textarea>
+            </label>
+          </div>
+          <div class="modal-footer">
+            <div class="footer-actions-right">
+              <button class="ghost-button" type="button" data-close-modal="workday-checkout">Cancelar</button>
+              <button class="primary-button" type="submit">Finalizar jornada</button>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+
     <div class="toast-container" id="toastContainer"></div>
 
     <script src="/app.js?v=3"></script>

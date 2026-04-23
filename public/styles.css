@@ -3277,3 +3277,51 @@ body.drawer-open {
     justify-content: center;
   }
 }
+
+
+.modal-card.modal-medium.checkout-modal-card {
+  max-width: 760px;
+}
+
+.checkout-modal-grid {
+  gap: 16px;
+}
+
+.work-session-form-minimal {
+  gap: 16px;
+}
+
+.workday-closure-hint {
+  display: flex;
+  align-items: center;
+  padding: 16px 18px;
+  border: 1px solid var(--border-color, rgba(255,255,255,0.08));
+  border-radius: 20px;
+  background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+}
+
+.workday-closure-copy {
+  display: grid;
+  gap: 4px;
+}
+
+.checkout-modal-card .modal-header {
+  align-items: start;
+}
+
+.checkout-modal-card textarea {
+  min-height: 112px;
+}
+
+.checkout-modal-card .modal-footer {
+  margin-top: 8px;
+}
+
+@media (max-width: 900px) {
+  .workday-closure-hint {
+    padding: 14px 16px;
+  }
+  .modal-card.modal-medium.checkout-modal-card {
+    width: min(92vw, 760px);
+  }
+}
