@@ -45,6 +45,8 @@ const state = {
     priority: 'all'
   },
   calendarCursor: startOfMonth(new Date()),
+  reportMonthCursor: startOfMonth(new Date()),
+  reportUserFilter: 'all',
   dragTaskId: '',
   authMode: 'login',
   tokenMode: '',
@@ -58,6 +60,7 @@ const els = {
   appShell: document.getElementById('appShell'),
   navTabs: document.getElementById('navTabs'),
   adminNavButton: document.getElementById('adminNavButton'),
+  reportsNavButton: document.getElementById('reportsNavButton'),
   sidebarQuickStats: document.getElementById('sidebarQuickStats'),
   pageTitle: document.getElementById('pageTitle'),
   topbarEyebrow: document.getElementById('topbarEyebrow'),
@@ -368,6 +371,162 @@ function getUserRemoteMetrics(userId) {
   };
 }
 
+function isActiveWorkSession(session) {
+  return Boolean(session?.checkInAt && !session?.checkOutAt);
+}
+
+function getSessionWorkedMinutes(session) {
+  const accruedMinutes = Number(session?.accruedMinutes || 0);
+  if (!session?.checkInAt && !accruedMinutes) return 0;
+  let totalMinutes = accruedMinutes;
+  if (session?.checkInAt && !session?.checkOutAt) {
+    const start = new Date(session.checkInAt).getTime();
+    const diff = Math.max(0, Date.now() - start);
+    totalMinutes += Math.floor(diff / 60000);
+  }
+  return Math.max(0, totalMinutes);
+}
+
+function monthKeyFromDate(date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  return `${year}-${month}`;
+}
+
+function monthLabel(date) {
+  return new Intl.DateTimeFormat('es-DO', { month: 'long', year: 'numeric' }).format(date);
+}
+
+function withinMonth(value, monthDate) {
+  if (!value) return false;
+  const key = String(value).slice(0, 7);
+  return key === monthKeyFromDate(monthDate);
+}
+
+function formatMinutes(totalMinutes) {
+  const minutes = Math.max(0, Math.floor(Number(totalMinutes || 0)));
+  const hours = Math.floor(minutes / 60);
+  return `${hours}h ${String(minutes % 60).padStart(2, '0')}m`;
+}
+
+function averageMinutes(totalMinutes, totalDays) {
+  if (!totalDays) return '0h 00m';
+  return formatMinutes(Math.round(totalMinutes / totalDays));
+}
+
+function getMonthSessions(monthDate, userId = '') {
+  return (state.workSessions || []).filter((session) => {
+    if (userId && session.userId !== userId) return false;
+    return withinMonth(session.dateKey || session.checkInAt || session.updatedAt, monthDate);
+  });
+}
+
+function getMonthTasks(monthDate, userId = '') {
+  return (state.tasks || []).filter((task) => {
+    if (userId && !taskMatchesAssignee(task, userId)) return false;
+    return withinMonth(task.dueDate || task.publishDate || task.updatedAt, monthDate);
+  });
+}
+
+function getMonthSubtasks(monthDate, userId = '') {
+  return (state.tasks || []).flatMap((task) => getTaskSubtasks(task)
+    .filter((subtask) => (!userId || subtask.assigneeId === userId) && withinMonth(subtask.dueDate || task.dueDate || task.updatedAt, monthDate))
+    .map((subtask) => ({ ...subtask, taskId: task.id, taskTitle: task.title })));
+}
+
+function buildMonthlyReport(monthDate) {
+  const monthSessions = getMonthSessions(monthDate);
+  const monthTasks = getMonthTasks(monthDate);
+  const monthSubtasks = getMonthSubtasks(monthDate);
+  const employeeRows = state.users
+    .filter((user) => state.reportUserFilter === 'all' || user.id === state.reportUserFilter)
+    .map((user) => {
+      const sessions = getMonthSessions(monthDate, user.id);
+      const totalMinutes = sessions.reduce((sum, session) => sum + getSessionWorkedMinutes(session), 0);
+      const daysWithEntry = sessions.filter((session) => session.checkInAt).length;
+      const tasks = getMonthTasks(monthDate, user.id);
+      const subtasks = getMonthSubtasks(monthDate, user.id);
+      const completedTasks = tasks.filter((task) => task.status === 'scheduled').length;
+      const overdueTasks = tasks.filter((task) => task.dueDate && task.dueDate < todayKey() && task.status !== 'scheduled').length;
+      const completedSubtasks = subtasks.filter((subtask) => subtask.status === 'scheduled').length;
+      const openSubtasks = subtasks.filter((subtask) => subtask.status !== 'scheduled').length;
+      const avgDailyMinutes = daysWithEntry ? Math.round(totalMinutes / daysWithEntry) : 0;
+      const scoreBase = Math.min(100, Math.round((completedTasks * 12) + (completedSubtasks * 2) + (daysWithEntry * 1.5) + (totalMinutes / 60) - (overdueTasks * 8)));
+      const score = Math.max(0, scoreBase);
+      return {
+        user,
+        sessions,
+        totalMinutes,
+        daysWithEntry,
+        avgDailyMinutes,
+        tasks,
+        completedTasks,
+        overdueTasks,
+        subtasks,
+        completedSubtasks,
+        openSubtasks,
+        lastActivity: getUserActivityLogs(user.id, 1)[0] || null,
+        status: getTodaySession(user.id)?.status || 'offline',
+        score
+      };
+    })
+    .sort((a, b) => b.totalMinutes - a.totalMinutes || b.score - a.score);
+
+  const totalMinutes = employeeRows.reduce((sum, row) => sum + row.totalMinutes, 0);
+  const totalDays = employeeRows.reduce((sum, row) => sum + row.daysWithEntry, 0);
+  const hoursByWeek = [0, 0, 0, 0, 0, 0];
+  monthSessions.forEach((session) => {
+    const date = new Date(`${session.dateKey}T00:00:00`);
+    const weekIndex = Math.min(5, Math.floor((date.getDate() - 1) / 7));
+    hoursByWeek[weekIndex] += getSessionWorkedMinutes(session);
+  });
+
+  return {
+    monthDate,
+    employeeRows,
+    totals: {
+      totalMinutes,
+      averageDailyMinutes: totalDays ? Math.round(totalMinutes / totalDays) : 0,
+      employeesWithEntry: employeeRows.filter((row) => row.daysWithEntry > 0).length,
+      tasksCompleted: employeeRows.reduce((sum, row) => sum + row.completedTasks, 0),
+      subtasksCompleted: employeeRows.reduce((sum, row) => sum + row.completedSubtasks, 0),
+      overdueTasks: employeeRows.reduce((sum, row) => sum + row.overdueTasks, 0),
+      compliance: monthTasks.length ? Math.round((employeeRows.reduce((sum, row) => sum + row.completedTasks, 0) / monthTasks.length) * 100) : 0
+    },
+    hoursByWeek
+  };
+}
+
+function exportMonthlyReportCsv(report) {
+  const rows = [
+    ['Empleado', 'Rol', 'Horas del mes', 'Días con entrada', 'Promedio diario', 'Tareas completadas', 'Subtareas completadas', 'Vencidas', 'Última actividad', 'Estado', 'Score'],
+    ...report.employeeRows.map((row) => [
+      row.user.name,
+      row.user.role,
+      formatMinutes(row.totalMinutes),
+      row.daysWithEntry,
+      formatMinutes(row.avgDailyMinutes),
+      row.completedTasks,
+      row.completedSubtasks,
+      row.overdueTasks,
+      row.lastActivity ? formatDateTime(row.lastActivity.createdAt) : '—',
+      workStatusLabel(row.status),
+      row.score
+    ])
+  ];
+  const csv = rows.map((row) => row.map((cell) => `"${String(cell).replaceAll('\"', '\"\"')}"`).join(',')).join('\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `rendimiento-${monthKeyFromDate(report.monthDate)}.csv`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
+
 function getSessionWorkedLabel(session) {
   const accruedMinutes = Number(session?.accruedMinutes || 0);
   if (!session?.checkInAt && !accruedMinutes) return 'Sin entrada';
@@ -405,6 +564,7 @@ function renderActivityFeedItems(items, emptyText = 'Aún no hay actividad regis
 function renderWorkSessionPanel({ context = 'profile' } = {}) {
   const session = getTodaySession(state.currentUser?.id);
   const statusKey = session?.status || 'offline';
+  const openSession = isActiveWorkSession(session);
   const isDashboard = context === 'dashboard';
   return `
     <section class="panel remote-control-panel ${isDashboard ? 'remote-dashboard-panel' : 'remote-profile-panel'}">
@@ -412,11 +572,12 @@ function renderWorkSessionPanel({ context = 'profile' } = {}) {
         <div>
           <p class="eyebrow">Jornada remota</p>
           <h3 class="panel-title">Mi control de trabajo</h3>
+          <p class="small-text">Marca entrada para iniciar en Disponible. Para cerrar jornada, completa los campos obligatorios y luego marca salida.</p>
         </div>
         <div class="table-actions wrap-actions remote-actions">
           <span class="badge stage-badge ${workStatusClass(statusKey)}">${escapeHtml(workStatusLabel(statusKey))}</span>
-          <button class="ghost-button" type="button" id="checkInButton" data-work-checkin ${session?.checkInAt ? 'disabled' : ''}>Marcar entrada</button>
-          <button class="ghost-button" type="button" id="checkOutButton" data-work-checkout ${session?.checkOutAt ? 'disabled' : ''}>Marcar salida</button>
+          <button class="ghost-button" type="button" id="checkInButton" data-work-checkin ${openSession ? 'disabled' : ''}>Marcar entrada</button>
+          <button class="ghost-button" type="button" id="checkOutButton" data-work-checkout ${!openSession ? 'disabled' : ''}>Marcar salida</button>
         </div>
       </div>
       <div class="stats-grid work-session-stats ${isDashboard ? 'dashboard-work-stats' : 'profile-work-stats'}">
@@ -431,15 +592,15 @@ function renderWorkSessionPanel({ context = 'profile' } = {}) {
           <select id="workStatus" class="work-status-select ${workStatusClass(statusKey)}">${renderWorkStatusOptions(statusKey)}</select>
         </label>
         <label class="field work-field-plan ${isDashboard ? 'field-span-2' : ''}">
-          <span>Plan del día</span>
+          <span>Plan del día <small class="required-hint">obligatorio al salir</small></span>
           <textarea id="workFocusPlan" rows="${isDashboard ? '2' : '3'}" placeholder="Ej: calendario de Eves Dental, captions y revisión de reels">${escapeHtml(session?.focusPlan || '')}</textarea>
         </label>
         <label class="field work-field-blockers ${isDashboard ? 'field-span-2' : ''}">
-          <span>Bloqueos o necesidades</span>
+          <span>Bloqueos o necesidades <small class="required-hint">obligatorio al salir</small></span>
           <textarea id="workBlockers" rows="2" placeholder="Ej: esperando aprobación, falta material, feedback pendiente">${escapeHtml(session?.blockers || '')}</textarea>
         </label>
         <label class="field work-field-summary ${isDashboard ? 'field-span-2' : ''}">
-          <span>Resumen de cierre</span>
+          <span>Resumen de cierre <small class="required-hint">obligatorio al salir</small></span>
           <textarea id="workEndSummary" rows="${isDashboard ? '2' : '3'}" placeholder="Qué dejaste listo hoy y qué sigue mañana">${escapeHtml(session?.endSummary || '')}</textarea>
         </label>
         <div class="work-form-footer ${isDashboard ? 'field-span-2' : ''}">
@@ -667,6 +828,7 @@ function updateTopbar() {
     calendar: 'Calendario',
     clients: 'Clientes',
     admin: 'Admin',
+    reports: 'Rendimiento',
     profile: 'Mi perfil'
   };
   els.pageTitle.textContent = map[state.tab] || 'Zia WorkSpace';
@@ -674,10 +836,13 @@ function updateTopbar() {
   const showToolbar = ['tasks', 'dashboard', 'calendar'].includes(state.tab);
   els.toolbarSection.classList.toggle('hidden', !showToolbar);
   els.taskViewToggle.classList.toggle('hidden', state.tab !== 'tasks');
-  els.newUserButton.classList.toggle('hidden', !isAdmin());
-  els.adminNavButton.classList.toggle('hidden', !isAdmin());
-  els.newClientButton.classList.toggle('hidden', !isAdmin());
-  els.newTaskButton.classList.toggle('hidden', !isAdmin());
+  const adminMode = isAdmin();
+  const showAdminActions = adminMode && ['dashboard', 'clients', 'admin', 'tasks', 'calendar'].includes(state.tab);
+  els.newUserButton.classList.toggle('hidden', !adminMode || state.tab === 'reports');
+  els.adminNavButton.classList.toggle('hidden', !adminMode);
+  els.reportsNavButton?.classList.toggle('hidden', !adminMode);
+  els.newClientButton.classList.toggle('hidden', !showAdminActions);
+  els.newTaskButton.classList.toggle('hidden', !showAdminActions);
 }
 
 function renderSidebarQuickStats() {
@@ -707,6 +872,7 @@ function render() {
   if (state.tab === 'calendar') return renderCalendar();
   if (state.tab === 'clients') return renderClients();
   if (state.tab === 'admin') return renderAdmin();
+  if (state.tab === 'reports') return renderReports();
   return renderProfile();
 }
 
@@ -1041,6 +1207,147 @@ function renderCalendar() {
       openTaskModal('', { dueDate: state.selectedCalendarDate, publishDate: state.selectedCalendarDate, fromCalendar: true });
     });
   }
+}
+
+
+function renderReports() {
+  if (!isAdmin()) {
+    state.tab = 'dashboard';
+    return renderDashboard();
+  }
+  const report = buildMonthlyReport(state.reportMonthCursor);
+  const weekMax = Math.max(1, ...report.hoursByWeek);
+  const lowHoursAlerts = report.employeeRows.filter((row) => row.totalMinutes < 80 * 60);
+  const overdueAlerts = report.employeeRows.filter((row) => row.overdueTasks >= 3);
+  const inactiveAlerts = report.employeeRows.filter((row) => row.daysWithEntry === 0);
+  const monthKey = monthKeyFromDate(state.reportMonthCursor);
+  const daysInMonth = new Date(state.reportMonthCursor.getFullYear(), state.reportMonthCursor.getMonth() + 1, 0).getDate();
+
+  els.workspace.innerHTML = `
+    <section class="panel reports-panel">
+      <div class="reports-header">
+        <div>
+          <p class="eyebrow">Rendimiento</p>
+          <h3 class="panel-title">Resumen mensual</h3>
+          <p class="small-text">Controla horas, asistencia, tareas y cumplimiento del equipo por mes.</p>
+        </div>
+        <div class="table-actions wrap-actions reports-actions">
+          <button class="ghost-button" type="button" data-report-prev-month>← Mes anterior</button>
+          <div class="report-month-chip">${escapeHtml(monthLabel(state.reportMonthCursor))}</div>
+          <button class="ghost-button" type="button" data-report-next-month>Mes siguiente →</button>
+          <select id="reportUserFilter" class="report-filter-select">
+            <option value="all">Todo el equipo</option>
+            ${state.users.map((user) => `<option value="${user.id}" ${state.reportUserFilter === user.id ? 'selected' : ''}>${escapeHtml(user.name)}</option>`).join('')}
+          </select>
+          <button class="primary-button" type="button" data-report-export>Exportar CSV</button>
+        </div>
+      </div>
+
+      <div class="stats-grid reports-kpis-grid">
+        <article class="stat-card"><p class="small-text">Horas del mes</p><div class="stat-value">${formatMinutes(report.totals.totalMinutes)}</div></article>
+        <article class="stat-card"><p class="small-text">Promedio diario</p><div class="stat-value">${formatMinutes(report.totals.averageDailyMinutes)}</div></article>
+        <article class="stat-card"><p class="small-text">Empleados con entrada</p><div class="stat-value">${report.totals.employeesWithEntry}/${report.employeeRows.length || 0}</div></article>
+        <article class="stat-card"><p class="small-text">Tareas completadas</p><div class="stat-value">${report.totals.tasksCompleted}</div></article>
+        <article class="stat-card"><p class="small-text">Subtareas completadas</p><div class="stat-value">${report.totals.subtasksCompleted}</div></article>
+        <article class="stat-card"><p class="small-text">Cumplimiento</p><div class="stat-value">${report.totals.compliance}%</div></article>
+      </div>
+
+      <div class="reports-grid">
+        <section class="panel inner-panel report-chart-panel">
+          <div class="panel-header compact-head">
+            <div>
+              <h4 class="panel-title no-margin">Horas por semana</h4>
+              <p class="small-text">Vista rápida de intensidad del equipo durante ${escapeHtml(monthLabel(state.reportMonthCursor))}.</p>
+            </div>
+          </div>
+          <div class="report-bars">
+            ${report.hoursByWeek.map((minutes, index) => `
+              <div class="report-bar-row">
+                <div class="small-text">Semana ${index + 1}</div>
+                <div class="report-bar-track"><span style="width:${Math.max(10, (minutes / weekMax) * 100)}%"></span></div>
+                <strong>${formatMinutes(minutes)}</strong>
+              </div>
+            `).join('')}
+          </div>
+        </section>
+
+        <section class="panel inner-panel report-alerts-panel">
+          <div class="panel-header compact-head">
+            <div>
+              <h4 class="panel-title no-margin">Alertas del mes</h4>
+              <p class="small-text">Detecta rápido baja actividad, horas cortas y vencimientos.</p>
+            </div>
+          </div>
+          <div class="alerts-stack">
+            <div class="alert-card"><strong>${lowHoursAlerts.length}</strong><span class="small-text">con menos de 80h acumuladas</span></div>
+            <div class="alert-card"><strong>${overdueAlerts.length}</strong><span class="small-text">con 3+ tareas vencidas</span></div>
+            <div class="alert-card"><strong>${inactiveAlerts.length}</strong><span class="small-text">sin entradas registradas en este mes</span></div>
+          </div>
+        </section>
+      </div>
+
+      <section class="panel inner-panel report-table-panel">
+        <div class="panel-header compact-head">
+          <div>
+            <h4 class="panel-title no-margin">Rendimiento por empleado</h4>
+            <p class="small-text">Horas acumuladas, asistencia, entregas, vencidas y score de seguimiento.</p>
+          </div>
+        </div>
+        <div class="report-employee-list">
+          ${report.employeeRows.map((row) => `
+            <article class="report-user-card">
+              <div class="report-user-top">
+                <div>
+                  <strong>${escapeHtml(row.user.name)}</strong>
+                  <div class="small-text">${escapeHtml(row.user.role)}</div>
+                </div>
+                <div class="report-score ${row.score >= 85 ? 'good' : row.score >= 65 ? 'mid' : 'low'}">${row.score}</div>
+              </div>
+              <div class="report-user-metrics">
+                <div><span class="small-text">Horas</span><strong>${formatMinutes(row.totalMinutes)}</strong></div>
+                <div><span class="small-text">Días</span><strong>${row.daysWithEntry}</strong></div>
+                <div><span class="small-text">Promedio</span><strong>${formatMinutes(row.avgDailyMinutes)}</strong></div>
+                <div><span class="small-text">Tareas</span><strong>${row.completedTasks}</strong></div>
+                <div><span class="small-text">Subtareas</span><strong>${row.completedSubtasks}</strong></div>
+                <div><span class="small-text">Vencidas</span><strong>${row.overdueTasks}</strong></div>
+              </div>
+              <div class="small-text">Última actividad: ${row.lastActivity ? escapeHtml(formatDateTime(row.lastActivity.createdAt)) : '—'} · Estado actual: ${escapeHtml(workStatusLabel(row.status))}</div>
+            </article>
+          `).join('') || '<div class="empty-state">No hay datos para ese filtro.</div>'}
+        </div>
+      </section>
+
+      <section class="panel inner-panel report-heatmap-panel">
+        <div class="panel-header compact-head">
+          <div>
+            <h4 class="panel-title no-margin">Mapa de actividad del mes</h4>
+            <p class="small-text">Cada celda representa el tiempo trabajado por día.</p>
+          </div>
+        </div>
+        <div class="report-heatmap-scroll">
+          <div class="report-heatmap-grid" style="grid-template-columns: 160px repeat(${daysInMonth}, minmax(24px, 1fr));">
+            <div></div>
+            ${Array.from({ length: daysInMonth }, (_, index) => `<div class="small-text heatmap-day-head">${index + 1}</div>`).join('')}
+            ${report.employeeRows.map((row) => {
+              const byDay = new Map(row.sessions.map((session) => [Number(String(session.dateKey).slice(-2)), getSessionWorkedMinutes(session)]));
+              return `
+                <div class="heatmap-user-name">${escapeHtml(row.user.name)}</div>
+                ${Array.from({ length: daysInMonth }, (_, idx) => {
+                  const day = idx + 1;
+                  const minutes = byDay.get(day) || 0;
+                  let level = 'none';
+                  if (minutes >= 360) level = 'high';
+                  else if (minutes >= 180) level = 'mid';
+                  else if (minutes > 0) level = 'low';
+                  return `<div class="heatmap-cell ${level}" title="${escapeHtml(row.user.name)} · Día ${day} · ${formatMinutes(minutes)}"></div>`;
+                }).join('')}
+              `;
+            }).join('')}
+          </div>
+        </div>
+      </section>
+    </section>
+  `;
 }
 
 function renderClients() {
@@ -1400,8 +1707,9 @@ function updateWorkSessionPanelVisuals() {
   });
   const checkInButton = document.getElementById('checkInButton');
   const checkOutButton = document.getElementById('checkOutButton');
-  if (checkInButton) checkInButton.disabled = Boolean(session?.checkInAt && !session?.checkOutAt);
-  if (checkOutButton) checkOutButton.disabled = !Boolean(session?.checkInAt) || Boolean(session?.checkOutAt);
+  const activeSession = isActiveWorkSession(session);
+  if (checkInButton) checkInButton.disabled = activeSession;
+  if (checkOutButton) checkOutButton.disabled = !activeSession;
   const workStatusSelect = document.getElementById('workStatus');
   if (workStatusSelect && !document.activeElement?.isSameNode(workStatusSelect)) {
     workStatusSelect.value = statusKey;
@@ -1436,6 +1744,39 @@ function pinLiveWorkSession(session) {
   state.liveWorkSessionIds[session.userId] = session.id;
 }
 
+function getCheckoutRequiredFields() {
+  return [
+    { id: 'workFocusPlan', label: 'Plan del día' },
+    { id: 'workBlockers', label: 'Bloqueos o necesidades' },
+    { id: 'workEndSummary', label: 'Resumen de cierre' }
+  ];
+}
+
+function clearCheckoutFieldErrors() {
+  getCheckoutRequiredFields().forEach((field) => {
+    const input = document.getElementById(field.id);
+    const wrapper = input?.closest('.field');
+    wrapper?.classList.remove('field-error');
+  });
+}
+
+function validateCheckoutFields() {
+  clearCheckoutFieldErrors();
+  const missing = getCheckoutRequiredFields().filter((field) => {
+    const input = document.getElementById(field.id);
+    const empty = !String(input?.value || '').trim();
+    if (empty) input?.closest('.field')?.classList.add('field-error');
+    return empty;
+  });
+  if (missing.length) {
+    const first = document.getElementById(missing[0].id);
+    first?.focus();
+    first?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    throw new Error(`Completa estos campos para cerrar tu jornada: ${missing.map((field) => field.label).join(', ')}.`);
+  }
+}
+
+
 function bindWorkSessionControls() {
   const workSessionForm = document.getElementById('workSessionForm');
   const checkInButton = document.getElementById('checkInButton');
@@ -1450,14 +1791,17 @@ function bindWorkSessionControls() {
   workSessionForm.addEventListener('submit', async (event) => {
     event.preventDefault();
     try {
+      const focusPlan = document.getElementById('workFocusPlan').value.trim();
+      const blockers = document.getElementById('workBlockers').value.trim();
+      const endSummary = document.getElementById('workEndSummary').value.trim();
       const result = await api('/api/work/session/today', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           status: document.getElementById('workStatus').value,
-          focusPlan: document.getElementById('workFocusPlan').value.trim(),
-          blockers: document.getElementById('workBlockers').value.trim(),
-          endSummary: document.getElementById('workEndSummary').value.trim()
+          focusPlan,
+          blockers,
+          endSummary
         })
       });
       const index = state.workSessions.findIndex((item) => item.id === result.session.id || (item.userId === result.session.userId && item.dateKey === result.session.dateKey));
@@ -1475,14 +1819,18 @@ function bindWorkSessionControls() {
 
   checkInButton.addEventListener('click', async () => {
     try {
+      clearCheckoutFieldErrors();
+      const focusPlan = document.getElementById('workFocusPlan').value.trim();
+      const blockers = document.getElementById('workBlockers').value.trim();
+      const endSummary = document.getElementById('workEndSummary').value.trim();
       const result = await api('/api/work/check-in', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          status: document.getElementById('workStatus').value,
-          focusPlan: document.getElementById('workFocusPlan').value.trim(),
-          blockers: document.getElementById('workBlockers').value.trim(),
-          endSummary: document.getElementById('workEndSummary').value.trim()
+          status: 'available',
+          focusPlan,
+          blockers,
+          endSummary
         })
       });
       const index = state.workSessions.findIndex((item) => item.id === result.session.id || (item.userId === result.session.userId && item.dateKey === result.session.dateKey));
@@ -1500,13 +1848,18 @@ function bindWorkSessionControls() {
 
   checkOutButton.addEventListener('click', async () => {
     try {
+      validateCheckoutFields();
+      const focusPlan = document.getElementById('workFocusPlan').value.trim();
+      const blockers = document.getElementById('workBlockers').value.trim();
+      const endSummary = document.getElementById('workEndSummary').value.trim();
       const result = await api('/api/work/check-out', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          focusPlan: document.getElementById('workFocusPlan').value.trim(),
-          blockers: document.getElementById('workBlockers').value.trim(),
-          endSummary: document.getElementById('workEndSummary').value.trim()
+          status: 'offline',
+          focusPlan,
+          blockers,
+          endSummary
         })
       });
       const index = state.workSessions.findIndex((item) => item.id === result.session.id || (item.userId === result.session.userId && item.dateKey === result.session.dateKey));
@@ -1877,6 +2230,35 @@ function bindDynamicActions() {
       }
     };
   }
+
+  document.querySelectorAll('[data-report-prev-month]').forEach((button) => {
+    button.addEventListener('click', () => {
+      state.reportMonthCursor = new Date(state.reportMonthCursor.getFullYear(), state.reportMonthCursor.getMonth() - 1, 1);
+      render();
+      bindDynamicActions();
+    });
+  });
+  document.querySelectorAll('[data-report-next-month]').forEach((button) => {
+    button.addEventListener('click', () => {
+      state.reportMonthCursor = new Date(state.reportMonthCursor.getFullYear(), state.reportMonthCursor.getMonth() + 1, 1);
+      render();
+      bindDynamicActions();
+    });
+  });
+  document.querySelectorAll('[data-report-export]').forEach((button) => {
+    button.addEventListener('click', () => {
+      exportMonthlyReportCsv(buildMonthlyReport(state.reportMonthCursor));
+    });
+  });
+  const reportUserFilter = document.getElementById('reportUserFilter');
+  if (reportUserFilter) {
+    reportUserFilter.addEventListener('change', (event) => {
+      state.reportUserFilter = event.target.value;
+      render();
+      bindDynamicActions();
+    });
+  }
+
   const notificationSettingsForm = document.getElementById('notificationSettingsForm');
   if (notificationSettingsForm) {
     notificationSettingsForm.addEventListener('submit', async (event) => {
@@ -1931,6 +2313,7 @@ async function refreshBootstrap() {
   state.workSessions = data.workSessions || [];
   state.activityLogs = data.activityLogs || [];
   state.notificationSettings = data.notificationSettings || state.notificationSettings;
+  if (!isAdmin() && state.tab === 'reports') state.tab = 'dashboard';
   seedSelectOptions();
   render();
   bindDynamicActions();
