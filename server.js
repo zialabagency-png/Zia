@@ -2130,9 +2130,9 @@ app.post('/api/work/check-in', requireAuth, async (req, res, next) => {
       userId: req.currentUser.id,
       dateKey: todayDateKey(),
       checkInAt: hasOpenSession ? existing.checkInAt : now,
-      checkOutAt: hasOpenSession ? '' : '',
+      checkOutAt: '',
       accruedMinutes: existing?.accruedMinutes || 0,
-      status: req.body.status || existing?.status || 'available',
+      status: 'available',
       focusPlan: req.body.focusPlan ?? existing?.focusPlan ?? '',
       endSummary: req.body.endSummary ?? existing?.endSummary ?? '',
       blockers: req.body.blockers ?? existing?.blockers ?? '',
@@ -2149,6 +2149,13 @@ app.post('/api/work/check-out', requireAuth, async (req, res, next) => {
   try {
     const existing = await adapter.getWorkSessionForDate(req.currentUser.id, todayDateKey());
     const now = nowIso();
+    const focusPlan = String(req.body.focusPlan || existing?.focusPlan || '').trim();
+    const blockers = String(req.body.blockers || existing?.blockers || '').trim();
+    const endSummary = String(req.body.endSummary || existing?.endSummary || '').trim();
+    if (!focusPlan || !blockers || !endSummary) {
+      res.status(400).json({ error: 'Para marcar salida debes completar plan del día, bloqueos o necesidades y resumen de cierre.' });
+      return;
+    }
     const currentCheckIn = existing?.checkInAt || now;
     const startedAt = new Date(currentCheckIn).getTime();
     const endedAt = new Date(now).getTime();
@@ -2160,10 +2167,10 @@ app.post('/api/work/check-out', requireAuth, async (req, res, next) => {
       checkInAt: currentCheckIn,
       checkOutAt: now,
       accruedMinutes: Math.max(0, Number(existing?.accruedMinutes || 0)) + extraMinutes,
-      status: req.body.status || 'offline',
-      focusPlan: req.body.focusPlan ?? existing?.focusPlan ?? '',
-      endSummary: req.body.endSummary ?? existing?.endSummary ?? '',
-      blockers: req.body.blockers ?? existing?.blockers ?? '',
+      status: 'offline',
+      focusPlan,
+      endSummary,
+      blockers,
       updatedAt: now
     });
     if (typeof adapter.createActivityLog === 'function') await adapter.createActivityLog({ userId: req.currentUser.id, kind: 'check_out', label: 'Marcó salida remota.', entityType: 'work_session', entityId: session.id, meta: { status: session.status } });
