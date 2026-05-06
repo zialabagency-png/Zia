@@ -4,7 +4,12 @@ const fs = require('fs');
 const crypto = require('crypto');
 const multer = require('multer');
 const nodemailer = require('nodemailer');
+const dns = require('dns');
 const { Pool } = require('pg');
+
+if (typeof dns.setDefaultResultOrder === 'function') {
+  dns.setDefaultResultOrder(process.env.DNS_RESULT_ORDER || 'ipv4first');
+}
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -1608,6 +1613,7 @@ function createMailer() {
   const smtpFrom = String(process.env.SMTP_FROM || '').trim() || (smtpUser ? `Zia WorkSpace <${smtpUser}>` : '');
   const smtpPort = Number(process.env.SMTP_PORT || 587);
   const hasAuth = Boolean(smtpUser && smtpPass);
+  const smtpFamily = Number(process.env.SMTP_FAMILY || 4) || undefined;
 
   if ((smtpHost || smtpService) && smtpFrom) {
     const transportConfig = smtpService
@@ -1616,7 +1622,8 @@ function createMailer() {
           auth: hasAuth ? { user: smtpUser, pass: smtpPass } : undefined,
           connectionTimeout: Number(process.env.SMTP_CONNECTION_TIMEOUT_MS || 10000),
           greetingTimeout: Number(process.env.SMTP_GREETING_TIMEOUT_MS || 10000),
-          socketTimeout: Number(process.env.SMTP_SOCKET_TIMEOUT_MS || 15000)
+          socketTimeout: Number(process.env.SMTP_SOCKET_TIMEOUT_MS || 15000),
+          family: smtpFamily
         }
       : {
           host: smtpHost,
@@ -1626,20 +1633,21 @@ function createMailer() {
           connectionTimeout: Number(process.env.SMTP_CONNECTION_TIMEOUT_MS || 10000),
           greetingTimeout: Number(process.env.SMTP_GREETING_TIMEOUT_MS || 10000),
           socketTimeout: Number(process.env.SMTP_SOCKET_TIMEOUT_MS || 15000),
-          tls: smtpHost ? { servername: smtpHost } : undefined
+          family: smtpFamily,
+          tls: smtpHost ? { servername: smtpHost, rejectUnauthorized: process.env.SMTP_REJECT_UNAUTHORIZED === 'false' ? false : true } : undefined
         };
     return {
       mode: 'smtp',
       from: smtpFrom,
       transporter: nodemailer.createTransport(transportConfig),
-      config: { smtpHost, smtpService, smtpPort, secure: smtpService ? 'service-default' : getSmtpSecureValue(smtpPort), hasAuth }
+      config: { smtpHost, smtpService, smtpPort, secure: smtpService ? 'service-default' : getSmtpSecureValue(smtpPort), hasAuth, family: smtpFamily }
     };
   }
   return {
     mode: 'log',
     from: smtpFrom || 'Zia WorkSpace <no-reply@zialab.com>',
     transporter: nodemailer.createTransport({ jsonTransport: true }),
-    config: { smtpHost, smtpService, smtpPort, secure: getSmtpSecureValue(smtpPort), hasAuth }
+    config: { smtpHost, smtpService, smtpPort, secure: getSmtpSecureValue(smtpPort), hasAuth, family: smtpFamily }
   };
 }
 const mailer = createMailer();
@@ -1693,6 +1701,8 @@ async function getMailDiagnostics() {
     smtpPort: mailer.config?.smtpPort || Number(process.env.SMTP_PORT || 587),
     secure: mailer.config?.secure,
     hasAuth: Boolean(mailer.config?.hasAuth),
+    smtpFamily: mailer.config?.family || null,
+    dnsResultOrder: process.env.DNS_RESULT_ORDER || 'ipv4first',
     from: mailer.from || '',
     appBaseUrl: APP_BASE_URL
   };
