@@ -3325,3 +3325,127 @@ body.drawer-open {
     width: min(92vw, 760px);
   }
 }
+
+/* Zia WorkSpace update: comentarios, menciones y entregables visuales */
+.mention-helper,
+.link-helper-card {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.035);
+  margin-top: 10px;
+}
+
+.mention-check-grid,
+.quick-link-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.mention-check-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.035);
+  cursor: pointer;
+}
+
+.mention-check-item input {
+  accent-color: var(--accent, #eb6210);
+}
+
+.mention-check-item span {
+  font-weight: 700;
+}
+
+.mention-check-item small {
+  opacity: 0.68;
+}
+
+.task-comments-list {
+  display: grid;
+  gap: 10px;
+}
+
+.task-comment-item,
+.task-last-comment {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.task-comment-item {
+  padding: 12px;
+}
+
+.task-comment-item p {
+  margin: 8px 0 0;
+  line-height: 1.45;
+}
+
+.task-comment-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: center;
+}
+
+.task-last-comment {
+  margin-top: 10px;
+  padding: 10px 12px;
+  font-size: 0.9rem;
+  line-height: 1.4;
+}
+
+.mention-badge {
+  border-color: rgba(235, 98, 16, 0.28);
+}
+
+.quick-link-buttons .small-button {
+  padding: 8px 10px;
+}
+
+@media (min-width: 760px) {
+  .mention-helper,
+  .link-helper-card {
+    grid-template-columns: minmax(220px, 0.8fr) 1.2fr;
+    align-items: start;
+  }
+}
+
+/* Zia WorkSpace hotfix: acciones rápidas visibles en tarjetas y tabla */
+.task-card-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.task-card-actions .text-button,
+.table-actions .text-button {
+  white-space: nowrap;
+}
+
+.task-card-actions [data-task-focus="links"],
+.table-actions [data-task-focus="links"] {
+  border-color: rgba(235, 98, 16, 0.28);
+  background: rgba(235, 98, 16, 0.08);
+}
+
+@media (max-width: 720px) {
+  .task-card-footer {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .task-card-actions {
+    justify-content: flex-start;
+  }
+}

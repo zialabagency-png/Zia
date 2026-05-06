@@ -1162,7 +1162,11 @@ function renderTaskCard(task) {
             ${renderStatusOptions(task.status)}
           </select>
         </label>
-        <button class="text-button" data-edit-task="${task.id}">Editar</button>
+        <div class="task-card-actions">
+          <button class="text-button" type="button" data-edit-task="${task.id}" data-task-focus="comment">Comentar</button>
+          <button class="text-button" type="button" data-edit-task="${task.id}" data-task-focus="links">+ Enlace</button>
+          <button class="text-button" type="button" data-edit-task="${task.id}">Editar</button>
+        </div>
       </div>
     </article>
   `;
@@ -1207,7 +1211,9 @@ function renderTaskTableHtml(tasks) {
               <td data-label="Enlaces">${resourceLinks.length}</td>
               <td data-label="Acciones">
                 <div class="table-actions">
-                  <button class="text-button" data-edit-task="${task.id}">Editar</button>
+                  <button class="text-button" type="button" data-edit-task="${task.id}" data-task-focus="comment">Comentar</button>
+                  <button class="text-button" type="button" data-edit-task="${task.id}" data-task-focus="links">+ Enlace</button>
+                  <button class="text-button" type="button" data-edit-task="${task.id}">Editar</button>
                 </div>
               </td>
             </tr>
@@ -1990,38 +1996,68 @@ function bindWorkSessionControls() {
 
 function openTaskModal(taskId = '', preset = {}) {
   const task = state.tasks.find((item) => item.id === taskId);
-  els.taskModalTitle.textContent = task ? 'Editar tarea' : 'Nueva tarea';
-  els.deleteTaskButton.classList.toggle('hidden', !task);
-  document.getElementById('taskId').value = task?.id || '';
-  document.getElementById('taskTitle').value = task?.title || '';
-  document.getElementById('taskClient').value = task?.clientId || state.clients[0]?.id || '';
-  document.getElementById('taskDescription').value = task?.description || '';
-  document.getElementById('taskType').value = task?.type || '';
-  document.getElementById('taskChannel').value = task?.channel || '';
-  document.getElementById('taskFormat').value = task?.format || '';
-  document.getElementById('taskAssigneesBox').innerHTML = renderAssigneeCheckboxes(getTaskAssigneeIds(task || {}));
-  document.getElementById('taskPriority').value = task?.priority || 'Media';
-  document.getElementById('taskStatus').value = task?.status || 'not_started';
-  document.getElementById('taskDueDate').value = task?.dueDate || preset.dueDate || '';
-  document.getElementById('taskPublishDate').value = task?.publishDate || preset.publishDate || '';
-  document.getElementById('taskApproval').checked = Boolean(task?.approvalRequired);
-  document.getElementById('taskLabels').value = (task?.labels || []).join(', ');
   if (!task && !isAdmin()) {
     showToast('Acceso restringido', 'Solo el admin puede crear tareas.', 'error');
     return;
   }
-  document.getElementById('taskChecklist').value = (task?.checklist || []).map((item) => item.text).join('\n');
-  document.getElementById('taskComment').value = '';
-  document.getElementById('taskMentionBox').innerHTML = renderMentionCheckboxes();
-  document.getElementById('taskLinks').value = getTaskResourceLinks(task).map((item) => item.url).join('\n');
+
+  const setValue = (id, value = '') => {
+    const field = document.getElementById(id);
+    if (field) field.value = value;
+  };
+  const setChecked = (id, value = false) => {
+    const field = document.getElementById(id);
+    if (field) field.checked = Boolean(value);
+  };
+  const setHtml = (id, html = '') => {
+    const field = document.getElementById(id);
+    if (field) field.innerHTML = html;
+  };
+
+  els.taskModalTitle.textContent = task ? 'Editar tarea' : 'Nueva tarea';
+  els.deleteTaskButton.classList.toggle('hidden', !task);
+  setValue('taskId', task?.id || '');
+  setValue('taskTitle', task?.title || '');
+  setValue('taskClient', task?.clientId || state.clients[0]?.id || '');
+  setValue('taskDescription', task?.description || '');
+  setValue('taskType', task?.type || '');
+  setValue('taskChannel', task?.channel || '');
+  setValue('taskFormat', task?.format || '');
+  setHtml('taskAssigneesBox', renderAssigneeCheckboxes(getTaskAssigneeIds(task || {})));
+  setValue('taskPriority', task?.priority || 'Media');
+  setValue('taskStatus', task?.status || 'not_started');
+  setValue('taskDueDate', task?.dueDate || preset.dueDate || '');
+  setValue('taskPublishDate', task?.publishDate || preset.publishDate || '');
+  setChecked('taskApproval', task?.approvalRequired);
+  setValue('taskLabels', (task?.labels || []).join(', '));
+  setValue('taskChecklist', (task?.checklist || []).map((item) => item.text).join('\n'));
+  setValue('taskComment', '');
+  setHtml('taskMentionBox', renderMentionCheckboxes());
+  setValue('taskLinks', getTaskResourceLinks(task).map((item) => item.url).join('\n'));
+
   renderTaskComments(task || null);
   renderTaskSubtasksEditor(task || null);
   renderTaskResourceLinks(task);
   els.taskModalBackdrop.classList.remove('hidden');
+
+  if (preset.focus === 'links') {
+    setTimeout(() => {
+      const linkField = document.getElementById('taskLinks');
+      linkField?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      linkField?.focus();
+    }, 80);
+  } else if (preset.focus === 'comment') {
+    setTimeout(() => {
+      const commentField = document.getElementById('taskComment');
+      commentField?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      commentField?.focus();
+    }, 80);
+  }
 }
 
 function renderTaskResourceLinks(task) {
   const container = document.getElementById('taskResourceLinkList');
+  if (!container) return;
   const links = getTaskResourceLinks(task);
   if (!links.length) {
     container.innerHTML = `<div class="empty-state">Agrega enlaces de Drive, Canva, Figma o Docs para compartir referencias y entregables.</div>`;
@@ -2240,7 +2276,16 @@ function bindBoardInteractions() {
 
 function bindDynamicActions() {
   document.querySelectorAll('[data-edit-task]').forEach((button) => {
-    button.addEventListener('click', () => openTaskModal(button.dataset.editTask));
+    button.addEventListener('click', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      try {
+        openTaskModal(button.dataset.editTask, { focus: button.dataset.taskFocus || '' });
+      } catch (error) {
+        console.error('Error abriendo tarea', error);
+        showToast('No se pudo abrir la tarea', error.message || 'Recarga e inténtalo otra vez.', 'error');
+      }
+    });
   });
   document.querySelectorAll('[data-task-status-select]').forEach((select) => {
     select.addEventListener('change', async () => {
@@ -2621,13 +2666,14 @@ function bindStaticEvents() {
     else openTaskModal();
   });
   document.getElementById('addSubtaskButton').addEventListener('click', () => addSubtaskRow());
-  document.getElementById('taskLinks').addEventListener('input', (event) => {
+  document.getElementById('taskLinks')?.addEventListener('input', (event) => {
     renderTaskResourceLinks({ resourceLinks: parseResourceLinks(event.target.value) });
   });
 
   document.querySelectorAll('[data-link-template]').forEach((button) => {
     button.addEventListener('click', () => {
       const field = document.getElementById('taskLinks');
+      if (!field) return;
       const current = field.value.trim();
       field.value = `${current}${current ? '\n' : ''}${button.dataset.linkTemplate}`;
       field.focus();
