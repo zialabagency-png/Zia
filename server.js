@@ -1598,6 +1598,17 @@ function createPostgresAdapter() {
 
 const adapter = process.env.DATABASE_URL ? createPostgresAdapter() : createFileAdapter();
 
+
+function createSmtpIpv4Lookup() {
+  return (hostname, options, callback) => {
+    const cb = typeof options === 'function' ? options : callback;
+    dns.lookup(hostname, { family: 4, all: false }, (error, address, family) => {
+      if (error) return cb(error);
+      return cb(null, address, family || 4);
+    });
+  };
+}
+
 function getSmtpSecureValue(port) {
   const raw = String(process.env.SMTP_SECURE || '').trim().toLowerCase();
   if (['true', '1', 'yes', 'si', 'sí'].includes(raw)) return true;
@@ -1614,6 +1625,8 @@ function createMailer() {
   const smtpPort = Number(process.env.SMTP_PORT || 587);
   const hasAuth = Boolean(smtpUser && smtpPass);
   const smtpFamily = Number(process.env.SMTP_FAMILY || 4) || undefined;
+  const forceIpv4 = String(process.env.SMTP_FORCE_IPV4 || 'true').trim().toLowerCase() !== 'false';
+  const smtpLookup = forceIpv4 ? createSmtpIpv4Lookup() : undefined;
 
   if ((smtpHost || smtpService) && smtpFrom) {
     const transportConfig = smtpService
@@ -1623,7 +1636,8 @@ function createMailer() {
           connectionTimeout: Number(process.env.SMTP_CONNECTION_TIMEOUT_MS || 10000),
           greetingTimeout: Number(process.env.SMTP_GREETING_TIMEOUT_MS || 10000),
           socketTimeout: Number(process.env.SMTP_SOCKET_TIMEOUT_MS || 15000),
-          family: smtpFamily
+          family: smtpFamily,
+          lookup: smtpLookup
         }
       : {
           host: smtpHost,
@@ -1634,20 +1648,21 @@ function createMailer() {
           greetingTimeout: Number(process.env.SMTP_GREETING_TIMEOUT_MS || 10000),
           socketTimeout: Number(process.env.SMTP_SOCKET_TIMEOUT_MS || 15000),
           family: smtpFamily,
+          lookup: smtpLookup,
           tls: smtpHost ? { servername: smtpHost, rejectUnauthorized: process.env.SMTP_REJECT_UNAUTHORIZED === 'false' ? false : true } : undefined
         };
     return {
       mode: 'smtp',
       from: smtpFrom,
       transporter: nodemailer.createTransport(transportConfig),
-      config: { smtpHost, smtpService, smtpPort, secure: smtpService ? 'service-default' : getSmtpSecureValue(smtpPort), hasAuth, family: smtpFamily }
+      config: { smtpHost, smtpService, smtpPort, secure: smtpService ? 'service-default' : getSmtpSecureValue(smtpPort), hasAuth, family: smtpFamily, forceIpv4 }
     };
   }
   return {
     mode: 'log',
     from: smtpFrom || 'Zia WorkSpace <no-reply@zialab.com>',
     transporter: nodemailer.createTransport({ jsonTransport: true }),
-    config: { smtpHost, smtpService, smtpPort, secure: getSmtpSecureValue(smtpPort), hasAuth, family: smtpFamily }
+    config: { smtpHost, smtpService, smtpPort, secure: getSmtpSecureValue(smtpPort), hasAuth, family: smtpFamily, forceIpv4 }
   };
 }
 const mailer = createMailer();
@@ -1702,6 +1717,7 @@ async function getMailDiagnostics() {
     secure: mailer.config?.secure,
     hasAuth: Boolean(mailer.config?.hasAuth),
     smtpFamily: mailer.config?.family || null,
+    smtpForceIpv4: mailer.config?.forceIpv4 !== false,
     dnsResultOrder: process.env.DNS_RESULT_ORDER || 'ipv4first',
     from: mailer.from || '',
     appBaseUrl: APP_BASE_URL
