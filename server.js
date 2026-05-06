@@ -1589,16 +1589,22 @@ async function sendTransactionalEmail({ to, subject, textBody, htmlBody, preview
     text: textBody,
     html: htmlBody
   };
-  await mailer.transporter.sendMail(payload);
+  let deliveryMode = mailer.mode;
+  try {
+    await mailer.transporter.sendMail(payload);
+  } catch (error) {
+    console.error('SMTP send failed:', error?.message || error);
+    deliveryMode = mailer.mode === 'smtp' ? 'smtp_error' : 'log_error';
+  }
   const log = await adapter.logEmail({
     toEmail: to,
     subject,
     textBody,
     htmlBody,
-    mode: mailer.mode,
+    mode: deliveryMode,
     previewLink
   });
-  return { mode: mailer.mode, log };
+  return { mode: deliveryMode, log };
 }
 
 async function createActionLink(user, type) {
@@ -1688,6 +1694,35 @@ function buildWorkspaceLink() {
 
 function getClientName(clients, clientId) {
   return clients.find((client) => client.id === clientId)?.name || 'Sin cliente';
+}
+
+function normalizeTaskCreateSignature(task) {
+  const assigneeIds = getTaskAssigneeIds(task).slice().sort().join(',');
+  return [
+    String(task.title || '').trim().toLowerCase(),
+    String(task.clientId || '').trim(),
+    String(task.type || '').trim().toLowerCase(),
+    String(task.channel || '').trim().toLowerCase(),
+    String(task.format || '').trim().toLowerCase(),
+    String(task.dueDate || '').trim(),
+    String(task.publishDate || '').trim(),
+    String(task.priority || '').trim().toLowerCase(),
+    String(task.status || '').trim().toLowerCase(),
+    assigneeIds
+  ].join('::');
+}
+
+async function findRecentDuplicateTaskForCreate(currentUser, payload) {
+  if (!currentUser?.id) return null;
+  const signature = normalizeTaskCreateSignature(payload);
+  if (!signature.replace(/::/g, '').trim()) return null;
+  const data = await adapter.getBootstrap(currentUser);
+  const now = Date.now();
+  return data.tasks.find((task) => {
+    if (task.createdById !== currentUser.id) return false;
+    if (now - new Date(task.createdAt || 0).getTime() > 90 * 1000) return false;
+    return normalizeTaskCreateSignature(task) === signature;
+  }) || null;
 }
 
 function buildTaskAssignmentEmail(user, task, clientName) {
@@ -1974,11 +2009,17 @@ app.post('/api/auth/forgot-password', async (req, res, next) => {
     const email = String(req.body.email || '').trim().toLowerCase();
     const user = email ? await adapter.findUserByEmail(email) : null;
     let previewLink = '';
+    let deliveryMode = '';
+    let message = 'Si el correo existe, enviamos un enlace para recuperar la contraseña.';
     if (user && user.status !== 'suspended') {
       const delivery = await sendResetEmail(user);
+      deliveryMode = delivery.mode;
       if (delivery.mode === 'log') previewLink = delivery.link;
+      if (delivery.mode === 'smtp_error') {
+        message = 'No pudimos enviar el correo ahora mismo. Revisa la configuración SMTP e inténtalo otra vez.';
+      }
     }
-    res.json({ ok: true, message: 'Si el correo existe, enviamos un enlace para recuperar la contraseña.', previewLink });
+    res.json({ ok: true, message, previewLink, deliveryMode });
   } catch (error) {
     next(error);
   }
@@ -2193,6 +2234,11 @@ app.post('/api/tasks', requireAuth, requireAdmin, async (req, res, next) => {
   try {
     const payload = { ...req.body, createdById: req.currentUser.id, updatedAt: nowIso() };
     delete payload.id;
+    const existingTask = await findRecentDuplicateTaskForCreate(req.currentUser, payload);
+    if (existingTask) {
+      res.json({ ...existingTask, deduped: true });
+      return;
+    }
     const task = await adapter.saveTask(payload);
     await maybeSendTaskAssignmentEmail(task, null);
     if (typeof adapter.createActivityLog === 'function') await adapter.createActivityLog({ userId: req.currentUser.id, kind: 'task_create', label: `Creó la tarea "${task.title}".`, entityType: 'task', entityId: task.id, meta: { status: task.status } });
