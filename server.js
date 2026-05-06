@@ -1715,7 +1715,43 @@ function createMailer() {
 const mailer = createMailer();
 const fallbackLogMailer = nodemailer.createTransport({ jsonTransport: true });
 
-async function sendMailWithTimeout(transporter, payload, timeoutMs = Number(process.env.MAIL_SEND_TIMEOUT_MS || 15000)) {
+
+function shouldUseIpv4ResolvedHost() {
+  return String(process.env.SMTP_FORCE_IPV4_SOCKET || process.env.SMTP_FORCE_IPV4_HOST || 'true').trim().toLowerCase() !== 'false';
+}
+
+async function createResolvedIpv4TransporterForSend() {
+  const smtpHost = String(process.env.SMTP_HOST || '').trim();
+  const smtpService = String(process.env.SMTP_SERVICE || '').trim();
+  const smtpUser = String(process.env.SMTP_USER || '').trim();
+  const smtpPass = String(process.env.SMTP_PASS || '').trim();
+  const smtpPort = Number(process.env.SMTP_PORT || 587);
+  const effectiveHost = (smtpService.toLowerCase() === 'gmail' && !smtpHost) ? 'smtp.gmail.com' : smtpHost;
+  const secureValue = getSmtpSecureValue(smtpPort);
+  const connectionTimeout = Number(process.env.SMTP_CONNECTION_TIMEOUT_MS || 30000);
+  const greetingTimeout = Number(process.env.SMTP_GREETING_TIMEOUT_MS || 30000);
+  const socketTimeout = Number(process.env.SMTP_SOCKET_TIMEOUT_MS || 60000);
+  if (!effectiveHost || !shouldUseIpv4ResolvedHost()) return mailer.transporter;
+  const addresses = await dns.promises.resolve4(effectiveHost);
+  const ipv4Address = addresses && addresses[0];
+  if (!ipv4Address) return mailer.transporter;
+  return nodemailer.createTransport({
+    host: ipv4Address,
+    port: smtpPort,
+    secure: secureValue,
+    auth: smtpUser && smtpPass ? { user: smtpUser, pass: smtpPass } : undefined,
+    connectionTimeout,
+    greetingTimeout,
+    socketTimeout,
+    requireTLS: !secureValue,
+    tls: {
+      servername: effectiveHost,
+      rejectUnauthorized: process.env.SMTP_REJECT_UNAUTHORIZED === 'false' ? false : true
+    }
+  });
+}
+
+async function sendMailWithTimeout(transporter, payload, timeoutMs = Number(process.env.MAIL_SEND_TIMEOUT_MS || 60000)) {
   return await Promise.race([
     transporter.sendMail(payload),
     new Promise((_, reject) => setTimeout(() => reject(new Error('MAIL_SEND_TIMEOUT')), timeoutMs))
@@ -1733,7 +1769,8 @@ async function sendTransactionalEmail({ to, subject, textBody, htmlBody, preview
   let deliveryMode = mailer.mode;
   if (mailer.mode === 'smtp') {
     try {
-      await sendMailWithTimeout(mailer.transporter, payload);
+      const activeTransporter = await createResolvedIpv4TransporterForSend();
+      await sendMailWithTimeout(activeTransporter, payload);
     } catch (error) {
       console.error('SMTP send failed, falling back to preview delivery:', error?.message || error);
       await fallbackLogMailer.sendMail(payload);
@@ -1767,6 +1804,8 @@ async function getMailDiagnostics() {
     smtpForceIpv4: mailer.config?.forceIpv4 !== false,
     smtpForceIpv4Socket: mailer.config?.forceSocket === true,
     dnsResultOrder: process.env.DNS_RESULT_ORDER || 'ipv4first',
+    smtpForceIpv4Host: shouldUseIpv4ResolvedHost(),
+    mailSendTimeoutMs: Number(process.env.MAIL_SEND_TIMEOUT_MS || 60000),
     from: mailer.from || '',
     appBaseUrl: APP_BASE_URL
   };
@@ -1774,7 +1813,8 @@ async function getMailDiagnostics() {
     return { ok: false, config, message: 'El correo está en modo registro porque faltan SMTP_HOST/SMTP_SERVICE o un remitente SMTP_FROM/SMTP_USER.' };
   }
   try {
-    await mailer.transporter.verify();
+    const activeTransporter = await createResolvedIpv4TransporterForSend();
+    await activeTransporter.verify();
     return { ok: true, config, message: 'SMTP verificado correctamente.' };
   } catch (error) {
     return { ok: false, config, message: error.message };
