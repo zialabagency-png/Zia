@@ -8,7 +8,9 @@ ZIA Flow es un workspace visual para agencia, diseñado para ZIA Lab con una exp
 - Dashboard operativo
 - Vista **Kanban** y vista **tabla**
 - Calendario mensual de entregas y publicaciones
-- CRUD de tareas
+- CRUD de tareas con permisos por rol
+- Comentarios internos con menciones a compañeros
+- Enlaces de entregables/referencias visibles tipo Monday
 - CRUD de clientes
 - Adjuntos por tarea
 - Perfil propio para cambiar nombre, correo y contraseña
@@ -20,6 +22,7 @@ ZIA Flow es un workspace visual para agencia, diseñado para ZIA Lab con una exp
   - resetear contraseña manualmente por API
   - ver log reciente de correos
 - Recuperación de contraseña por email
+- Diagnóstico SMTP desde `/api/admin/mail-diagnostics`
 - Activación de cuenta por invitación
 - SMTP listo para invitaciones, recuperación y recordatorios de tareas
 - Ajustes de notificaciones por admin + ejecución manual de recordatorios
@@ -72,12 +75,15 @@ Credenciales iniciales:
 
 ### Email SMTP
 
+Puedes configurar por host SMTP tradicional o por servicio de Nodemailer. Si no defines `SMTP_FROM`, el sistema usa `SMTP_USER` como remitente cuando esté disponible.
+
+- `SMTP_SERVICE=gmail` opcional si usas un servicio reconocido por Nodemailer
 - `SMTP_HOST=smtp.tudominio.com`
 - `SMTP_PORT=587`
 - `SMTP_SECURE=false`
 - `SMTP_USER=usuario`
 - `SMTP_PASS=clave`
-- `SMTP_FROM=ZIA Flow <no-reply@tudominio.com>`
+- `SMTP_FROM=ZIA Flow <no-reply@tudominio.com>` opcional si `SMTP_USER` es un correo válido
 
 ### Recordatorios
 
@@ -93,6 +99,16 @@ Credenciales iniciales:
 - `REMINDER_DUE_SOON_HOURS=24`
 - `REMINDER_OVERDUE=true`
 - `REMINDER_OVERDUE_REPEAT_HOURS=24`
+
+## Cómo validar el email
+
+Con sesión admin abierta, puedes consultar:
+
+```bash
+curl -b cookies.txt https://tu-dominio.com/api/admin/mail-diagnostics
+```
+
+Debe responder `ok: true` cuando SMTP esté realmente conectado. Si responde `mode: log`, el sistema está guardando previews pero no enviando correos reales.
 
 ## Cómo funciona el email en desarrollo
 
