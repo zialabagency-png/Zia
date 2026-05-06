@@ -1593,35 +1593,53 @@ function createPostgresAdapter() {
 
 const adapter = process.env.DATABASE_URL ? createPostgresAdapter() : createFileAdapter();
 
+function getSmtpSecureValue(port) {
+  const raw = String(process.env.SMTP_SECURE || '').trim().toLowerCase();
+  if (['true', '1', 'yes', 'si', 'sí'].includes(raw)) return true;
+  if (['false', '0', 'no'].includes(raw)) return false;
+  return Number(port) === 465;
+}
+
 function createMailer() {
   const smtpHost = String(process.env.SMTP_HOST || '').trim();
   const smtpService = String(process.env.SMTP_SERVICE || '').trim();
   const smtpUser = String(process.env.SMTP_USER || '').trim();
   const smtpPass = String(process.env.SMTP_PASS || '').trim();
   const smtpFrom = String(process.env.SMTP_FROM || '').trim() || (smtpUser ? `Zia WorkSpace <${smtpUser}>` : '');
+  const smtpPort = Number(process.env.SMTP_PORT || 587);
+  const hasAuth = Boolean(smtpUser && smtpPass);
 
   if ((smtpHost || smtpService) && smtpFrom) {
     const transportConfig = smtpService
-      ? { service: smtpService, auth: smtpUser ? { user: smtpUser, pass: smtpPass } : undefined }
+      ? {
+          service: smtpService,
+          auth: hasAuth ? { user: smtpUser, pass: smtpPass } : undefined,
+          connectionTimeout: Number(process.env.SMTP_CONNECTION_TIMEOUT_MS || 10000),
+          greetingTimeout: Number(process.env.SMTP_GREETING_TIMEOUT_MS || 10000),
+          socketTimeout: Number(process.env.SMTP_SOCKET_TIMEOUT_MS || 15000)
+        }
       : {
           host: smtpHost,
-          port: Number(process.env.SMTP_PORT || 587),
-          secure: process.env.SMTP_SECURE === 'true',
-          auth: smtpUser ? { user: smtpUser, pass: smtpPass } : undefined,
-          connectionTimeout: Number(process.env.SMTP_CONNECTION_TIMEOUT_MS || 8000),
-          greetingTimeout: Number(process.env.SMTP_GREETING_TIMEOUT_MS || 8000),
-          socketTimeout: Number(process.env.SMTP_SOCKET_TIMEOUT_MS || 12000)
+          port: smtpPort,
+          secure: getSmtpSecureValue(smtpPort),
+          auth: hasAuth ? { user: smtpUser, pass: smtpPass } : undefined,
+          connectionTimeout: Number(process.env.SMTP_CONNECTION_TIMEOUT_MS || 10000),
+          greetingTimeout: Number(process.env.SMTP_GREETING_TIMEOUT_MS || 10000),
+          socketTimeout: Number(process.env.SMTP_SOCKET_TIMEOUT_MS || 15000),
+          tls: smtpHost ? { servername: smtpHost } : undefined
         };
     return {
       mode: 'smtp',
       from: smtpFrom,
-      transporter: nodemailer.createTransport(transportConfig)
+      transporter: nodemailer.createTransport(transportConfig),
+      config: { smtpHost, smtpService, smtpPort, secure: smtpService ? 'service-default' : getSmtpSecureValue(smtpPort), hasAuth }
     };
   }
   return {
     mode: 'log',
     from: smtpFrom || 'Zia WorkSpace <no-reply@zialab.com>',
-    transporter: nodemailer.createTransport({ jsonTransport: true })
+    transporter: nodemailer.createTransport({ jsonTransport: true }),
+    config: { smtpHost, smtpService, smtpPort, secure: getSmtpSecureValue(smtpPort), hasAuth }
   };
 }
 const mailer = createMailer();
@@ -1672,6 +1690,9 @@ async function getMailDiagnostics() {
     hasSmtpService: Boolean(process.env.SMTP_SERVICE),
     hasSmtpUser: Boolean(process.env.SMTP_USER),
     hasSmtpPass: Boolean(process.env.SMTP_PASS),
+    smtpPort: mailer.config?.smtpPort || Number(process.env.SMTP_PORT || 587),
+    secure: mailer.config?.secure,
+    hasAuth: Boolean(mailer.config?.hasAuth),
     from: mailer.from || '',
     appBaseUrl: APP_BASE_URL
   };
@@ -1850,7 +1871,7 @@ async function maybeSendTaskMentionEmails(task, previousTask = null, actingUser 
     for (const userId of uniqStrings(comment.mentionIds)) {
       if (userId === actingUser?.id) continue;
       const user = await adapter.getUserById(userId);
-      if (!user || user.status !== 'active' || !user.email) continue;
+      if (!user || user.status === 'suspended' || !user.email) continue;
       const email = buildTaskMentionEmail(user, task, comment, actingUser, getClientName(bootstrap.clients, task.clientId));
       await sendTransactionalEmail({ to: user.email, ...email });
       sent += 1;
@@ -1932,7 +1953,7 @@ async function maybeSendTaskAssignmentEmail(task, previousTask = null) {
   let sent = 0;
   for (const userId of targetIds) {
     const user = await adapter.getUserById(userId);
-    if (!user || user.status !== 'active' || !user.email) continue;
+    if (!user || user.status === 'suspended' || !user.email) continue;
     const email = buildTaskAssignmentEmail(user, task, getClientName(bootstrap.clients, task.clientId));
     await sendTransactionalEmail({ to: user.email, ...email });
     sent += 1;
@@ -2546,7 +2567,7 @@ app.post('/api/admin/users', requireAuth, requireAdmin, async (req, res, next) =
     let previewLink = '';
     let deliveryMode = '';
     if (sendInvite || !password) {
-      const delivery = await sendInviteEmail({ ...userPayload });
+      const delivery = await sendInviteEmail(user);
       previewLink = delivery.mode === 'log' ? delivery.link : '';
       deliveryMode = delivery.mode;
     }
@@ -2660,6 +2681,27 @@ app.delete('/api/admin/users/:id', requireAuth, requireAdmin, async (req, res, n
 app.get('/api/admin/mail-diagnostics', requireAuth, requireAdmin, async (_req, res, next) => {
   try {
     res.json(await getMailDiagnostics());
+  } catch (error) {
+    next(error);
+  }
+});
+
+
+app.post('/api/admin/mail-test', requireAuth, requireAdmin, async (req, res, next) => {
+  try {
+    const to = String(req.body?.to || req.currentUser.email || '').trim().toLowerCase();
+    if (!to) {
+      res.status(400).json({ error: 'Correo destino requerido.' });
+      return;
+    }
+    const result = await sendTransactionalEmail({
+      to,
+      subject: 'Prueba de correo · Zia WorkSpace',
+      textBody: `Esta es una prueba de correo desde Zia WorkSpace. Fecha: ${nowIso()}`,
+      htmlBody: `<p>Esta es una prueba de correo desde <strong>Zia WorkSpace</strong>.</p><p>Fecha: ${nowIso()}</p>`,
+      previewLink: APP_BASE_URL
+    });
+    res.json({ ok: true, mode: result.mode });
   } catch (error) {
     next(error);
   }
