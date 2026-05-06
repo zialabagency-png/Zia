@@ -5,6 +5,8 @@ const crypto = require('crypto');
 const multer = require('multer');
 const nodemailer = require('nodemailer');
 const dns = require('dns');
+const net = require('net');
+const tls = require('tls');
 const { Pool } = require('pg');
 
 if (typeof dns.setDefaultResultOrder === 'function') {
@@ -1609,6 +1611,49 @@ function createSmtpIpv4Lookup() {
   };
 }
 
+function resolveSmtpIpv4(hostname) {
+  return new Promise((resolve, reject) => {
+    dns.lookup(hostname, { family: 4, all: false }, (error, address) => {
+      if (error) return reject(error);
+      return resolve(address);
+    });
+  });
+}
+
+function createSmtpIpv4SocketFactory({ host, port, secure, timeoutMs }) {
+  return async (_options, callback) => {
+    try {
+      const address = await resolveSmtpIpv4(host);
+      const socketOptions = {
+        host: address,
+        port,
+        family: 4,
+        servername: host,
+        timeout: timeoutMs
+      };
+      const connection = secure
+        ? tls.connect(socketOptions)
+        : net.createConnection(socketOptions);
+      let settled = false;
+      const finish = (error) => {
+        if (settled) return;
+        settled = true;
+        if (error) return callback(error);
+        return callback(null, { connection });
+      };
+
+      connection.once('error', finish);
+      if (secure) {
+        connection.once('secureConnect', () => finish());
+      } else {
+        connection.once('connect', () => finish());
+      }
+    } catch (error) {
+      callback(error);
+    }
+  };
+}
+
 function getSmtpSecureValue(port) {
   const raw = String(process.env.SMTP_SECURE || '').trim().toLowerCase();
   if (['true', '1', 'yes', 'si', 'sí'].includes(raw)) return true;
@@ -1627,35 +1672,37 @@ function createMailer() {
   const smtpFamily = Number(process.env.SMTP_FAMILY || 4) || undefined;
   const forceIpv4 = String(process.env.SMTP_FORCE_IPV4 || 'true').trim().toLowerCase() !== 'false';
   const smtpLookup = forceIpv4 ? createSmtpIpv4Lookup() : undefined;
+  const connectionTimeout = Number(process.env.SMTP_CONNECTION_TIMEOUT_MS || 10000);
+  const greetingTimeout = Number(process.env.SMTP_GREETING_TIMEOUT_MS || 10000);
+  const socketTimeout = Number(process.env.SMTP_SOCKET_TIMEOUT_MS || 15000);
+  const normalizedServiceHost = smtpService.toLowerCase() === 'gmail' && !smtpHost ? 'smtp.gmail.com' : smtpHost;
+  const effectiveHost = normalizedServiceHost || smtpHost;
+  const secureValue = getSmtpSecureValue(smtpPort);
+  const forceSocket = forceIpv4 && Boolean(effectiveHost) && String(process.env.SMTP_FORCE_IPV4_SOCKET || 'true').trim().toLowerCase() !== 'false';
+  const ipv4SocketFactory = forceSocket
+    ? createSmtpIpv4SocketFactory({ host: effectiveHost, port: smtpPort, secure: secureValue, timeoutMs: connectionTimeout })
+    : undefined;
 
   if ((smtpHost || smtpService) && smtpFrom) {
-    const transportConfig = smtpService
-      ? {
-          service: smtpService,
-          auth: hasAuth ? { user: smtpUser, pass: smtpPass } : undefined,
-          connectionTimeout: Number(process.env.SMTP_CONNECTION_TIMEOUT_MS || 10000),
-          greetingTimeout: Number(process.env.SMTP_GREETING_TIMEOUT_MS || 10000),
-          socketTimeout: Number(process.env.SMTP_SOCKET_TIMEOUT_MS || 15000),
-          family: smtpFamily,
-          lookup: smtpLookup
-        }
-      : {
-          host: smtpHost,
-          port: smtpPort,
-          secure: getSmtpSecureValue(smtpPort),
-          auth: hasAuth ? { user: smtpUser, pass: smtpPass } : undefined,
-          connectionTimeout: Number(process.env.SMTP_CONNECTION_TIMEOUT_MS || 10000),
-          greetingTimeout: Number(process.env.SMTP_GREETING_TIMEOUT_MS || 10000),
-          socketTimeout: Number(process.env.SMTP_SOCKET_TIMEOUT_MS || 15000),
-          family: smtpFamily,
-          lookup: smtpLookup,
-          tls: smtpHost ? { servername: smtpHost, rejectUnauthorized: process.env.SMTP_REJECT_UNAUTHORIZED === 'false' ? false : true } : undefined
-        };
+    const transportConfig = {
+      host: effectiveHost || undefined,
+      service: effectiveHost ? undefined : smtpService,
+      port: smtpPort,
+      secure: secureValue,
+      auth: hasAuth ? { user: smtpUser, pass: smtpPass } : undefined,
+      connectionTimeout,
+      greetingTimeout,
+      socketTimeout,
+      family: smtpFamily,
+      lookup: smtpLookup,
+      getSocket: ipv4SocketFactory,
+      tls: effectiveHost ? { servername: effectiveHost, rejectUnauthorized: process.env.SMTP_REJECT_UNAUTHORIZED === 'false' ? false : true } : undefined
+    };
     return {
       mode: 'smtp',
       from: smtpFrom,
       transporter: nodemailer.createTransport(transportConfig),
-      config: { smtpHost, smtpService, smtpPort, secure: smtpService ? 'service-default' : getSmtpSecureValue(smtpPort), hasAuth, family: smtpFamily, forceIpv4 }
+      config: { smtpHost: effectiveHost || smtpHost, smtpService, smtpPort, secure: secureValue, hasAuth, family: smtpFamily, forceIpv4, forceSocket }
     };
   }
   return {
@@ -1718,6 +1765,7 @@ async function getMailDiagnostics() {
     hasAuth: Boolean(mailer.config?.hasAuth),
     smtpFamily: mailer.config?.family || null,
     smtpForceIpv4: mailer.config?.forceIpv4 !== false,
+    smtpForceIpv4Socket: mailer.config?.forceSocket === true,
     dnsResultOrder: process.env.DNS_RESULT_ORDER || 'ipv4first',
     from: mailer.from || '',
     appBaseUrl: APP_BASE_URL
