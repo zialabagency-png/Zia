@@ -1643,6 +1643,7 @@ function createSmtpIpv4SocketFactory({ host, port, secure, timeoutMs }) {
       };
 
       connection.once('error', finish);
+      connection.once('timeout', () => finish(new Error('SMTP_SOCKET_TIMEOUT')));
       if (secure) {
         connection.once('secureConnect', () => finish());
       } else {
@@ -1661,19 +1662,163 @@ function getSmtpSecureValue(port) {
   return Number(port) === 465;
 }
 
+function firstEnv(names) {
+  for (const name of names) {
+    const value = String(process.env[name] || '').trim();
+    if (value) return value;
+  }
+  return '';
+}
+
+function parseEmailAddress(value, fallbackName = 'Zia WorkSpace') {
+  const raw = String(value || '').trim();
+  const match = raw.match(/^(.*?)<([^>]+)>$/);
+  if (match) {
+    return { name: match[1].trim().replace(/^['\"]|['\"]$/g, '') || fallbackName, email: match[2].trim() };
+  }
+  return { name: fallbackName, email: raw };
+}
+
+function getPrimaryFromAddress() {
+  const smtpUser = String(process.env.SMTP_USER || '').trim();
+  return String(process.env.SMTP_FROM || '').trim() || (smtpUser ? `Zia WorkSpace <${smtpUser}>` : 'Zia WorkSpace <no-reply@zialab.com>');
+}
+
+function getHttpEmailProviderConfig() {
+  const provider = String(process.env.EMAIL_PROVIDER || process.env.MAIL_PROVIDER || 'auto').trim().toLowerCase();
+  const from = getPrimaryFromAddress();
+  const resendKey = firstEnv(['RESEND_API_KEY', 'EMAIL_RESEND_API_KEY']);
+  const brevoKey = firstEnv(['BREVO_API_KEY', 'SENDINBLUE_API_KEY', 'EMAIL_BREVO_API_KEY']);
+  const sendgridKey = firstEnv(['SENDGRID_API_KEY', 'EMAIL_SENDGRID_API_KEY']);
+  const mailersendKey = firstEnv(['MAILERSEND_API_KEY', 'EMAIL_MAILERSEND_API_KEY']);
+  const postmarkKey = firstEnv(['POSTMARK_API_TOKEN', 'POSTMARK_SERVER_TOKEN', 'EMAIL_POSTMARK_API_TOKEN']);
+  const providers = [];
+  if (resendKey) providers.push({ name: 'resend', key: resendKey });
+  if (brevoKey) providers.push({ name: 'brevo', key: brevoKey });
+  if (sendgridKey) providers.push({ name: 'sendgrid', key: sendgridKey });
+  if (mailersendKey) providers.push({ name: 'mailersend', key: mailersendKey });
+  if (postmarkKey) providers.push({ name: 'postmark', key: postmarkKey });
+  if (provider && !['auto', 'smtp', 'log'].includes(provider)) {
+    const selected = providers.find((item) => item.name === provider);
+    return selected ? { ...selected, from, forced: true } : null;
+  }
+  return provider === 'smtp' || provider === 'log' ? null : (providers[0] ? { ...providers[0], from } : null);
+}
+
+async function fetchJsonWithTimeout(url, options = {}, timeoutMs = 15000) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(url, { ...options, signal: controller.signal });
+    const text = await response.text();
+    let data = null;
+    try { data = text ? JSON.parse(text) : null; } catch (_error) { data = text; }
+    if (!response.ok) {
+      const detail = typeof data === 'string' ? data : (data?.message || data?.error || data?.errors?.[0]?.message || JSON.stringify(data || {}));
+      throw new Error(`${response.status} ${response.statusText}: ${detail}`.slice(0, 600));
+    }
+    return data;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+async function sendViaHttpEmailProvider(provider, payload, timeoutMs = 15000) {
+  const from = parseEmailAddress(provider.from || payload.from);
+  const toList = String(payload.to || '')
+    .split(',')
+    .map((email) => email.trim())
+    .filter(Boolean);
+  if (!toList.length) throw new Error('EMAIL_TO_REQUIRED');
+
+  if (provider.name === 'resend') {
+    await fetchJsonWithTimeout('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${provider.key}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ from: payload.from, to: toList, subject: payload.subject, text: payload.text, html: payload.html })
+    }, timeoutMs);
+    return { mode: 'resend' };
+  }
+
+  if (provider.name === 'brevo') {
+    await fetchJsonWithTimeout('https://api.brevo.com/v3/smtp/email', {
+      method: 'POST',
+      headers: { 'api-key': provider.key, 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify({
+        sender: { name: from.name, email: from.email },
+        to: toList.map((email) => ({ email })),
+        subject: payload.subject,
+        textContent: payload.text,
+        htmlContent: payload.html
+      })
+    }, timeoutMs);
+    return { mode: 'brevo' };
+  }
+
+  if (provider.name === 'sendgrid') {
+    await fetchJsonWithTimeout('https://api.sendgrid.com/v3/mail/send', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${provider.key}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        personalizations: [{ to: toList.map((email) => ({ email })) }],
+        from,
+        subject: payload.subject,
+        content: [
+          { type: 'text/plain', value: payload.text || '' },
+          { type: 'text/html', value: payload.html || payload.text || '' }
+        ]
+      })
+    }, timeoutMs);
+    return { mode: 'sendgrid' };
+  }
+
+  if (provider.name === 'mailersend') {
+    await fetchJsonWithTimeout('https://api.mailersend.com/v1/email', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${provider.key}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        from,
+        to: toList.map((email) => ({ email })),
+        subject: payload.subject,
+        text: payload.text,
+        html: payload.html
+      })
+    }, timeoutMs);
+    return { mode: 'mailersend' };
+  }
+
+  if (provider.name === 'postmark') {
+    await fetchJsonWithTimeout('https://api.postmarkapp.com/email', {
+      method: 'POST',
+      headers: { 'X-Postmark-Server-Token': provider.key, 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify({
+        From: payload.from,
+        To: toList.join(','),
+        Subject: payload.subject,
+        TextBody: payload.text,
+        HtmlBody: payload.html,
+        MessageStream: process.env.POSTMARK_MESSAGE_STREAM || 'outbound'
+      })
+    }, timeoutMs);
+    return { mode: 'postmark' };
+  }
+
+  throw new Error(`EMAIL_PROVIDER_UNSUPPORTED:${provider.name}`);
+}
+
 function createMailer() {
   const smtpHost = String(process.env.SMTP_HOST || '').trim();
   const smtpService = String(process.env.SMTP_SERVICE || '').trim();
   const smtpUser = String(process.env.SMTP_USER || '').trim();
   const smtpPass = String(process.env.SMTP_PASS || '').trim();
-  const smtpFrom = String(process.env.SMTP_FROM || '').trim() || (smtpUser ? `Zia WorkSpace <${smtpUser}>` : '');
+  const smtpFrom = getPrimaryFromAddress();
   const smtpPort = Number(process.env.SMTP_PORT || 587);
   const hasAuth = Boolean(smtpUser && smtpPass);
   const smtpFamily = Number(process.env.SMTP_FAMILY || 4) || undefined;
   const forceIpv4 = String(process.env.SMTP_FORCE_IPV4 || 'true').trim().toLowerCase() !== 'false';
   const smtpLookup = forceIpv4 ? createSmtpIpv4Lookup() : undefined;
-  const connectionTimeout = Number(process.env.SMTP_CONNECTION_TIMEOUT_MS || 10000);
-  const greetingTimeout = Number(process.env.SMTP_GREETING_TIMEOUT_MS || 10000);
+  const connectionTimeout = Number(process.env.SMTP_CONNECTION_TIMEOUT_MS || 12000);
+  const greetingTimeout = Number(process.env.SMTP_GREETING_TIMEOUT_MS || 12000);
   const socketTimeout = Number(process.env.SMTP_SOCKET_TIMEOUT_MS || 15000);
   const normalizedServiceHost = smtpService.toLowerCase() === 'gmail' && !smtpHost ? 'smtp.gmail.com' : smtpHost;
   const effectiveHost = normalizedServiceHost || smtpHost;
@@ -1696,6 +1841,7 @@ function createMailer() {
       family: smtpFamily,
       lookup: smtpLookup,
       getSocket: ipv4SocketFactory,
+      requireTLS: !secureValue,
       tls: effectiveHost ? { servername: effectiveHost, rejectUnauthorized: process.env.SMTP_REJECT_UNAUTHORIZED === 'false' ? false : true } : undefined
     };
     return {
@@ -1707,14 +1853,13 @@ function createMailer() {
   }
   return {
     mode: 'log',
-    from: smtpFrom || 'Zia WorkSpace <no-reply@zialab.com>',
+    from: smtpFrom,
     transporter: nodemailer.createTransport({ jsonTransport: true }),
     config: { smtpHost, smtpService, smtpPort, secure: getSmtpSecureValue(smtpPort), hasAuth, family: smtpFamily, forceIpv4 }
   };
 }
 const mailer = createMailer();
 const fallbackLogMailer = nodemailer.createTransport({ jsonTransport: true });
-
 
 function shouldUseIpv4ResolvedHost() {
   return String(process.env.SMTP_FORCE_IPV4_SOCKET || process.env.SMTP_FORCE_IPV4_HOST || 'true').trim().toLowerCase() !== 'false';
@@ -1728,9 +1873,9 @@ async function createResolvedIpv4TransporterForSend() {
   const smtpPort = Number(process.env.SMTP_PORT || 587);
   const effectiveHost = (smtpService.toLowerCase() === 'gmail' && !smtpHost) ? 'smtp.gmail.com' : smtpHost;
   const secureValue = getSmtpSecureValue(smtpPort);
-  const connectionTimeout = Number(process.env.SMTP_CONNECTION_TIMEOUT_MS || 30000);
-  const greetingTimeout = Number(process.env.SMTP_GREETING_TIMEOUT_MS || 30000);
-  const socketTimeout = Number(process.env.SMTP_SOCKET_TIMEOUT_MS || 60000);
+  const connectionTimeout = Number(process.env.SMTP_CONNECTION_TIMEOUT_MS || 12000);
+  const greetingTimeout = Number(process.env.SMTP_GREETING_TIMEOUT_MS || 12000);
+  const socketTimeout = Number(process.env.SMTP_SOCKET_TIMEOUT_MS || 15000);
   if (!effectiveHost || !shouldUseIpv4ResolvedHost()) return mailer.transporter;
   const addresses = await dns.promises.resolve4(effectiveHost);
   const ipv4Address = addresses && addresses[0];
@@ -1751,14 +1896,50 @@ async function createResolvedIpv4TransporterForSend() {
   });
 }
 
-async function sendMailWithTimeout(transporter, payload, timeoutMs = Number(process.env.MAIL_SEND_TIMEOUT_MS || 60000)) {
+async function sendMailWithTimeout(transporter, payload, timeoutMs = Number(process.env.MAIL_SEND_TIMEOUT_MS || 15000)) {
+  const safeTimeoutMs = Math.max(5000, Math.min(Number(timeoutMs || 15000), Number(process.env.MAIL_SEND_MAX_TIMEOUT_MS || 20000)));
   return await Promise.race([
     transporter.sendMail(payload),
-    new Promise((_, reject) => setTimeout(() => reject(new Error('MAIL_SEND_TIMEOUT')), timeoutMs))
+    new Promise((_, reject) => setTimeout(() => reject(new Error('MAIL_SEND_TIMEOUT')), safeTimeoutMs))
   ]);
 }
 
-async function sendTransactionalEmail({ to, subject, textBody, htmlBody, previewLink = '' }) {
+async function deliverEmailPayload(payload, { timeoutMs = 15000 } = {}) {
+  const forcedProvider = String(process.env.EMAIL_PROVIDER || process.env.MAIL_PROVIDER || 'auto').trim().toLowerCase();
+  const httpProvider = getHttpEmailProviderConfig();
+  const attempts = [];
+
+  if (forcedProvider === 'log') {
+    await fallbackLogMailer.sendMail(payload);
+    return { mode: 'log', attempts: [{ mode: 'log', ok: true }] };
+  }
+
+  if (httpProvider) {
+    try {
+      const result = await sendViaHttpEmailProvider(httpProvider, payload, timeoutMs);
+      return { ...result, attempts: [{ mode: result.mode, ok: true }] };
+    } catch (error) {
+      attempts.push({ mode: httpProvider.name, ok: false, error: error?.message || String(error) });
+      if (httpProvider.forced || forcedProvider === httpProvider.name) throw error;
+    }
+  }
+
+  if (mailer.mode === 'smtp' && forcedProvider !== 'http') {
+    try {
+      const activeTransporter = await createResolvedIpv4TransporterForSend();
+      await sendMailWithTimeout(activeTransporter, payload, timeoutMs);
+      return { mode: 'smtp', attempts: [...attempts, { mode: 'smtp', ok: true }] };
+    } catch (error) {
+      attempts.push({ mode: 'smtp', ok: false, error: error?.message || String(error) });
+      console.error('SMTP send failed, falling back to preview delivery:', error?.message || error);
+    }
+  }
+
+  await fallbackLogMailer.sendMail(payload);
+  return { mode: 'log', attempts: [...attempts, { mode: 'log', ok: true }] };
+}
+
+async function sendTransactionalEmail({ to, subject, textBody, htmlBody, previewLink = '', timeoutMs = 15000 }) {
   const payload = {
     from: mailer.from || process.env.SMTP_FROM || 'Zia WorkSpace <no-reply@zialab.com>',
     to,
@@ -1766,33 +1947,37 @@ async function sendTransactionalEmail({ to, subject, textBody, htmlBody, preview
     text: textBody,
     html: htmlBody
   };
-  let deliveryMode = mailer.mode;
-  if (mailer.mode === 'smtp') {
-    try {
-      const activeTransporter = await createResolvedIpv4TransporterForSend();
-      await sendMailWithTimeout(activeTransporter, payload);
-    } catch (error) {
-      console.error('SMTP send failed, falling back to preview delivery:', error?.message || error);
-      await fallbackLogMailer.sendMail(payload);
-      deliveryMode = 'log';
-    }
-  } else {
-    await fallbackLogMailer.sendMail(payload);
-  }
+  const delivery = await deliverEmailPayload(payload, { timeoutMs });
   const log = await adapter.logEmail({
     toEmail: to,
     subject,
     textBody,
     htmlBody,
-    mode: deliveryMode,
+    mode: delivery.mode,
     previewLink
   });
-  return { mode: deliveryMode, log };
+  return { mode: delivery.mode, log, attempts: delivery.attempts || [] };
+}
+
+function queueTransactionalEmail(emailPayload) {
+  setTimeout(() => {
+    sendTransactionalEmail(emailPayload).catch((error) => {
+      console.error('Queued email failed:', error?.message || error);
+    });
+  }, 0);
+  return { ok: true, queued: true };
 }
 
 async function getMailDiagnostics() {
+  const httpProvider = getHttpEmailProviderConfig();
   const config = {
-    mode: mailer.mode,
+    mode: httpProvider ? httpProvider.name : mailer.mode,
+    provider: String(process.env.EMAIL_PROVIDER || process.env.MAIL_PROVIDER || 'auto').trim().toLowerCase(),
+    hasResendApiKey: Boolean(firstEnv(['RESEND_API_KEY', 'EMAIL_RESEND_API_KEY'])),
+    hasBrevoApiKey: Boolean(firstEnv(['BREVO_API_KEY', 'SENDINBLUE_API_KEY', 'EMAIL_BREVO_API_KEY'])),
+    hasSendgridApiKey: Boolean(firstEnv(['SENDGRID_API_KEY', 'EMAIL_SENDGRID_API_KEY'])),
+    hasMailersendApiKey: Boolean(firstEnv(['MAILERSEND_API_KEY', 'EMAIL_MAILERSEND_API_KEY'])),
+    hasPostmarkApiToken: Boolean(firstEnv(['POSTMARK_API_TOKEN', 'POSTMARK_SERVER_TOKEN', 'EMAIL_POSTMARK_API_TOKEN'])),
     hasSmtpHost: Boolean(process.env.SMTP_HOST),
     hasSmtpService: Boolean(process.env.SMTP_SERVICE),
     hasSmtpUser: Boolean(process.env.SMTP_USER),
@@ -1805,19 +1990,27 @@ async function getMailDiagnostics() {
     smtpForceIpv4Socket: mailer.config?.forceSocket === true,
     dnsResultOrder: process.env.DNS_RESULT_ORDER || 'ipv4first',
     smtpForceIpv4Host: shouldUseIpv4ResolvedHost(),
-    mailSendTimeoutMs: Number(process.env.MAIL_SEND_TIMEOUT_MS || 60000),
+    mailSendTimeoutMs: Number(process.env.MAIL_SEND_TIMEOUT_MS || 15000),
     from: mailer.from || '',
     appBaseUrl: APP_BASE_URL
   };
+  if (httpProvider) {
+    return { ok: true, config, message: `Proveedor HTTP activo: ${httpProvider.name}.` };
+  }
   if (mailer.mode !== 'smtp') {
-    return { ok: false, config, message: 'El correo está en modo registro porque faltan SMTP_HOST/SMTP_SERVICE o un remitente SMTP_FROM/SMTP_USER.' };
+    return { ok: false, config, message: 'El correo está en modo registro porque no hay proveedor HTTP ni SMTP completo. En Render se recomienda RESEND_API_KEY, BREVO_API_KEY o SENDGRID_API_KEY para evitar bloqueos SMTP.' };
   }
   try {
     const activeTransporter = await createResolvedIpv4TransporterForSend();
-    await activeTransporter.verify();
-    return { ok: true, config, message: 'SMTP verificado correctamente.' };
+    await sendMailWithTimeout(activeTransporter, {
+      from: mailer.from,
+      to: parseEmailAddress(mailer.from).email,
+      subject: 'SMTP verify noop',
+      text: 'Verificación interna de Zia WorkSpace.'
+    }, 8000);
+    return { ok: true, config, message: 'SMTP respondió correctamente.' };
   } catch (error) {
-    return { ok: false, config, message: error.message };
+    return { ok: false, config, message: `${error.message}. Si Render sigue dando timeout con Gmail SMTP, activa un proveedor HTTP como Resend, Brevo o SendGrid.` };
   }
 }
 
@@ -1987,7 +2180,7 @@ async function maybeSendTaskMentionEmails(task, previousTask = null, actingUser 
       const user = await adapter.getUserById(userId);
       if (!user || user.status === 'suspended' || !user.email) continue;
       const email = buildTaskMentionEmail(user, task, comment, actingUser, getClientName(bootstrap.clients, task.clientId));
-      await sendTransactionalEmail({ to: user.email, ...email });
+      queueTransactionalEmail({ to: user.email, ...email });
       sent += 1;
     }
   }
@@ -2069,7 +2262,7 @@ async function maybeSendTaskAssignmentEmail(task, previousTask = null) {
     const user = await adapter.getUserById(userId);
     if (!user || user.status === 'suspended' || !user.email) continue;
     const email = buildTaskAssignmentEmail(user, task, getClientName(bootstrap.clients, task.clientId));
-    await sendTransactionalEmail({ to: user.email, ...email });
+    queueTransactionalEmail({ to: user.email, ...email });
     sent += 1;
   }
   return { ok: true, sent };
@@ -2111,7 +2304,7 @@ async function processTaskReminders({ triggeredBy = 'system' } = {}) {
         const digestKey = `digest:${today}:${user.id}`;
         if (!(await adapter.findReminderEvent(digestKey))) {
           const email = buildDailyDigestEmail(user, assignedTasks, snapshot.clients, settings.timezone);
-          await sendTransactionalEmail({ to: user.email, ...email });
+          queueTransactionalEmail({ to: user.email, ...email });
           await adapter.createReminderEvent({ kind: 'digest', dedupeKey: digestKey, userId: user.id, meta: { taskCount: assignedTasks.length, triggeredBy } });
           sent += 1;
         } else {
@@ -2128,7 +2321,7 @@ async function processTaskReminders({ triggeredBy = 'system' } = {}) {
             const dedupeKey = `due_soon:${task.id}:${user.id}:${task.dueDate}`;
             if (!(await adapter.findReminderEvent(dedupeKey))) {
               const email = buildTaskReminderEmail(user, task, getClientName(snapshot.clients, task.clientId), 'dueSoon', { daysLeft });
-              await sendTransactionalEmail({ to: user.email, ...email });
+              queueTransactionalEmail({ to: user.email, ...email });
               await adapter.createReminderEvent({ kind: 'due_soon', dedupeKey, taskId: task.id, userId: user.id, meta: { daysLeft, triggeredBy } });
               sent += 1;
             } else {
@@ -2143,7 +2336,7 @@ async function processTaskReminders({ triggeredBy = 'system' } = {}) {
           const dedupeKey = `overdue:${task.id}:${user.id}:${bucket}`;
           if (!(await adapter.findReminderEvent(dedupeKey))) {
             const email = buildTaskReminderEmail(user, task, getClientName(snapshot.clients, task.clientId), 'overdue', { daysOverdue });
-            await sendTransactionalEmail({ to: user.email, ...email });
+            queueTransactionalEmail({ to: user.email, ...email });
             await adapter.createReminderEvent({ kind: 'overdue', dedupeKey, taskId: task.id, userId: user.id, meta: { daysOverdue, bucket, triggeredBy } });
             sent += 1;
           } else {

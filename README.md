@@ -162,3 +162,72 @@ zia-flow/
 - Si no existe, usa `data/db.json` para que puedas abrirlo al instante sin bloquear el desarrollo.
 - El scheduler de recordatorios corre en el mismo servidor con `setInterval`; en Render funciona bien mientras el servicio esté activo.
 - También puedes disparar recordatorios manualmente desde el panel Admin.
+
+## Correos en Render: solución definitiva recomendada
+
+Render puede dejar los puertos SMTP de Gmail en timeout aunque las variables estén correctas. Por eso esta versión mantiene SMTP, pero agrega proveedores por HTTP para producción. HTTP no usa los puertos SMTP 465/587 y evita los errores `Connection timeout`, `MAIL_SEND_TIMEOUT` o rutas IPv6.
+
+### Opción recomendada: Resend
+
+```env
+EMAIL_PROVIDER=resend
+RESEND_API_KEY=re_xxxxxxxxxxxxxxxxx
+SMTP_FROM=ZIA WorkSpace <jhofrankny@zialabagency.com>
+APP_BASE_URL=https://workspace.zialabagency.com
+```
+
+### Alternativas soportadas
+
+Brevo:
+
+```env
+EMAIL_PROVIDER=brevo
+BREVO_API_KEY=xkeysib-xxxxxxxxxxxxxxxxx
+SMTP_FROM=ZIA WorkSpace <jhofrankny@zialabagency.com>
+```
+
+SendGrid:
+
+```env
+EMAIL_PROVIDER=sendgrid
+SENDGRID_API_KEY=SG.xxxxxxxxxxxxxxxxx
+SMTP_FROM=ZIA WorkSpace <jhofrankny@zialabagency.com>
+```
+
+MailerSend:
+
+```env
+EMAIL_PROVIDER=mailersend
+MAILERSEND_API_KEY=xxxxxxxxxxxxxxxxx
+SMTP_FROM=ZIA WorkSpace <jhofrankny@zialabagency.com>
+```
+
+Postmark:
+
+```env
+EMAIL_PROVIDER=postmark
+POSTMARK_API_TOKEN=xxxxxxxxxxxxxxxxx
+SMTP_FROM=ZIA WorkSpace <jhofrankny@zialabagency.com>
+```
+
+### Compatibilidad SMTP
+
+El sistema sigue soportando Gmail SMTP, pero si Render bloquea o retrasa la conexión, la app no se queda trabada: registra el intento y mantiene el flujo vivo.
+
+```env
+EMAIL_PROVIDER=smtp
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_SECURE=false
+SMTP_USER=jhofrankny@zialabagency.com
+SMTP_PASS=app-password
+SMTP_FROM=ZIA WorkSpace <jhofrankny@zialabagency.com>
+SMTP_FORCE_IPV4=true
+SMTP_FORCE_IPV4_SOCKET=true
+SMTP_FORCE_IPV4_HOST=true
+DNS_RESULT_ORDER=ipv4first
+```
+
+### Validación desde el panel
+
+Entra como admin y usa **Admin > Ajustes de correo > Probar correo**. Si el modo devuelve `resend`, `brevo`, `sendgrid`, `mailersend`, `postmark` o `smtp`, el correo salió por un proveedor real. Si devuelve `log`, el sistema no se rompió, pero falta activar un proveedor real.
