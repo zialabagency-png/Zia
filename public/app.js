@@ -283,16 +283,137 @@ function getLastTaskComment(task) {
   return comments[0] || null;
 }
 
+function getMentionableUsers() {
+  return state.users.filter((user) => user.id !== state.currentUser?.id && user.status !== 'disabled' && user.status !== 'suspended');
+}
+
+function normalizeMentionText(value = '') {
+  return String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim();
+}
+
 function renderMentionCheckboxes(selectedIds = []) {
   const selected = uniqueIds(selectedIds);
-  return state.users
-    .filter((user) => user.id !== state.currentUser?.id && user.status !== 'disabled')
-    .map((user) => `<label class="mention-check-item"><input type="checkbox" value="${user.id}" ${selected.includes(user.id) ? 'checked' : ''} /><span>@${escapeHtml(user.name)}</span><small>${escapeHtml(user.role)}</small></label>`)
-    .join('') || '<div class="empty-state compact-empty">No hay compañeros disponibles para etiquetar.</div>';
+  if (!selected.length) {
+    return '<div class="empty-state compact-empty">Aún no has mencionado a nadie en este comentario.</div>';
+  }
+  return selected.map((userId) => {
+    const user = state.users.find((item) => item.id === userId);
+    if (!user) return '';
+    return `<span class="mention-selected-chip"><input type="checkbox" value="${escapeHtml(user.id)}" checked hidden /><span>@${escapeHtml(user.name)}</span><small>${escapeHtml(user.role || 'Equipo')}</small><button type="button" data-remove-mention="${escapeHtml(user.id)}" aria-label="Quitar mención">×</button></span>`;
+  }).filter(Boolean).join('') || '<div class="empty-state compact-empty">Aún no has mencionado a nadie en este comentario.</div>';
+}
+
+function setSelectedMentionIds(ids = []) {
+  const container = document.getElementById('taskMentionBox');
+  if (!container) return;
+  container.innerHTML = renderMentionCheckboxes(ids);
 }
 
 function getSelectedMentionIds() {
   return [...document.querySelectorAll('#taskMentionBox input[type="checkbox"]:checked')].map((input) => input.value);
+}
+
+function getMentionTokenInfo(field) {
+  if (!field) return null;
+  const cursor = typeof field.selectionStart === 'number' ? field.selectionStart : field.value.length;
+  const beforeCursor = field.value.slice(0, cursor);
+  const match = beforeCursor.match(/(^|\s)@([^@\n\r]*)$/);
+  if (!match) return null;
+  const query = match[2].trimStart();
+  if (query.includes('  ')) return null;
+  const tokenStart = cursor - match[2].length - 1;
+  return { cursor, tokenStart, query };
+}
+
+function hideMentionAutocomplete() {
+  const list = document.getElementById('taskMentionAutocomplete');
+  if (!list) return;
+  list.classList.add('hidden');
+  list.innerHTML = '';
+}
+
+function renderMentionAutocomplete() {
+  const field = document.getElementById('taskComment');
+  const list = document.getElementById('taskMentionAutocomplete');
+  if (!field || !list) return;
+  const token = getMentionTokenInfo(field);
+  if (!token) {
+    hideMentionAutocomplete();
+    return;
+  }
+  const selected = new Set(getSelectedMentionIds());
+  const query = normalizeMentionText(token.query);
+  const users = getMentionableUsers()
+    .filter((user) => !selected.has(user.id))
+    .filter((user) => {
+      if (!query) return true;
+      return [user.name, user.email, user.role]
+        .map(normalizeMentionText)
+        .some((value) => value.includes(query));
+    })
+    .slice(0, 8);
+
+  if (!users.length) {
+    list.innerHTML = '<div class="mention-autocomplete-empty">No hay compañeros disponibles con ese nombre.</div>';
+    list.classList.remove('hidden');
+    return;
+  }
+
+  list.innerHTML = users.map((user) => `
+    <button type="button" class="mention-option" data-add-mention="${escapeHtml(user.id)}" role="option">
+      <span class="mention-avatar">${escapeHtml((user.name || '?').slice(0, 1).toUpperCase())}</span>
+      <span><strong>@${escapeHtml(user.name)}</strong><small>${escapeHtml(user.role || 'Equipo')}${user.email ? ` · ${escapeHtml(user.email)}` : ''}</small></span>
+    </button>
+  `).join('');
+  list.classList.remove('hidden');
+}
+
+function addMentionToComment(userId) {
+  const user = state.users.find((item) => item.id === userId);
+  const field = document.getElementById('taskComment');
+  if (!user || !field) return;
+  const token = getMentionTokenInfo(field);
+  const selected = uniqueIds([...getSelectedMentionIds(), userId]);
+  setSelectedMentionIds(selected);
+
+  if (token) {
+    const mentionText = `@${user.name}`;
+    const before = field.value.slice(0, token.tokenStart);
+    const after = field.value.slice(token.cursor);
+    const needsLeadingSpace = before && !/\s$/.test(before) ? ' ' : '';
+    field.value = `${before}${needsLeadingSpace}${mentionText} ${after}`;
+    const nextCursor = `${before}${needsLeadingSpace}${mentionText} `.length;
+    field.focus();
+    field.setSelectionRange(nextCursor, nextCursor);
+  } else {
+    const prefix = field.value.trim() ? `${field.value.trim()} ` : '';
+    field.value = `${prefix}@${user.name} `;
+    field.focus();
+    field.setSelectionRange(field.value.length, field.value.length);
+  }
+  hideMentionAutocomplete();
+}
+
+function removeMentionFromComment(userId) {
+  setSelectedMentionIds(getSelectedMentionIds().filter((id) => id !== userId));
+  renderMentionAutocomplete();
+}
+
+function inferMentionIdsFromComment(text = '') {
+  const normalized = normalizeMentionText(text);
+  if (!normalized.includes('@')) return [];
+  return getMentionableUsers()
+    .filter((user) => {
+      const name = normalizeMentionText(user.name);
+      const email = normalizeMentionText(user.email);
+      const emailUser = normalizeMentionText(String(user.email || '').split('@')[0]);
+      return (name && normalized.includes(`@${name}`)) || (email && normalized.includes(`@${email}`)) || (emailUser && normalized.includes(`@${emailUser}`));
+    })
+    .map((user) => user.id);
 }
 
 function renderTaskComments(task) {
@@ -2164,7 +2285,8 @@ async function saveTaskFromForm() {
       ...(() => {
         const commentText = document.getElementById('taskComment').value.trim();
         if (!commentText) return [];
-        return [{ text: commentText, authorId: state.currentUser.id, mentionIds: getSelectedMentionIds(), createdAt: new Date().toISOString() }];
+        const mentionIds = uniqueIds([...getSelectedMentionIds(), ...inferMentionIdsFromComment(commentText)]);
+        return [{ text: commentText, authorId: state.currentUser.id, mentionIds, createdAt: new Date().toISOString() }];
       })()
     ],
     createdAt: original?.createdAt,
@@ -2711,6 +2833,40 @@ function bindStaticEvents() {
   document.getElementById('addSubtaskButton').addEventListener('click', () => addSubtaskRow());
   document.getElementById('taskLinks')?.addEventListener('input', (event) => {
     renderTaskResourceLinks({ resourceLinks: parseResourceLinks(event.target.value) });
+  });
+
+  const taskCommentField = document.getElementById('taskComment');
+  taskCommentField?.addEventListener('input', renderMentionAutocomplete);
+  taskCommentField?.addEventListener('keyup', renderMentionAutocomplete);
+  taskCommentField?.addEventListener('click', renderMentionAutocomplete);
+  taskCommentField?.addEventListener('keydown', (event) => {
+    const list = document.getElementById('taskMentionAutocomplete');
+    if (event.key === 'Escape' && list && !list.classList.contains('hidden')) {
+      event.preventDefault();
+      hideMentionAutocomplete();
+    }
+    if ((event.key === 'Enter' || event.key === 'Tab') && list && !list.classList.contains('hidden')) {
+      const firstOption = list.querySelector('[data-add-mention]');
+      if (firstOption) {
+        event.preventDefault();
+        addMentionToComment(firstOption.dataset.addMention);
+      }
+    }
+  });
+  document.addEventListener('click', (event) => {
+    const addButton = event.target.closest('[data-add-mention]');
+    if (addButton) {
+      event.preventDefault();
+      addMentionToComment(addButton.dataset.addMention);
+      return;
+    }
+    const removeButton = event.target.closest('[data-remove-mention]');
+    if (removeButton) {
+      event.preventDefault();
+      removeMentionFromComment(removeButton.dataset.removeMention);
+      return;
+    }
+    if (!event.target.closest('.comment-mention-field')) hideMentionAutocomplete();
   });
 
   document.querySelectorAll('[data-link-template]').forEach((button) => {

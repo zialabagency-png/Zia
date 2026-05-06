@@ -218,9 +218,17 @@
               <span>Checklist (una línea por punto)</span>
               <textarea id="taskChecklist" rows="4"></textarea>
             </label>
-            <label class="field full-row">
+            <label class="field full-row comment-mention-field">
               <span>Comentario nuevo</span>
-              <textarea id="taskComment" rows="3" placeholder="Nota interna adicional"></textarea>
+              <textarea id="taskComment" rows="3" placeholder="Escribe una nota y usa @ para mencionar a un compañero"></textarea>
+              <div id="taskMentionAutocomplete" class="mention-autocomplete hidden" role="listbox" aria-label="Compañeros disponibles para mencionar"></div>
+              <div class="mention-helper compact-mention-helper">
+                <div>
+                  <strong>Mencionar compañero</strong>
+                  <p class="small-text">Escribe @ y selecciona quién debe continuar o revisar esta parte. La persona recibirá una notificación por correo.</p>
+                </div>
+                <div id="taskMentionBox" class="mention-selected-list"></div>
+              </div>
             </label>
           </div>
 

@@ -3567,3 +3567,120 @@ body.drawer-open {
     min-width: 0;
   }
 }
+
+/* Hotfix Zia WorkSpace: menciones con @ dentro del comentario de tarea */
+.comment-mention-field {
+  position: relative;
+}
+
+.compact-mention-helper {
+  margin-top: 10px;
+  gap: 10px;
+}
+
+.mention-selected-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-height: 38px;
+  align-items: center;
+}
+
+.mention-selected-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(235, 98, 16, 0.34);
+  background: rgba(235, 98, 16, 0.10);
+  color: var(--text, #f5f5f5);
+  max-width: 100%;
+}
+
+.mention-selected-chip span {
+  font-weight: 800;
+}
+
+.mention-selected-chip small {
+  color: var(--muted, #a7adbd);
+}
+
+.mention-selected-chip button {
+  width: 22px;
+  height: 22px;
+  display: inline-grid;
+  place-items: center;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  color: inherit;
+  cursor: pointer;
+  line-height: 1;
+}
+
+.mention-selected-chip button:hover {
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.mention-autocomplete {
+  position: static;
+  z-index: 50;
+  display: grid;
+  margin-top: -2px;
+  gap: 6px;
+  max-height: 260px;
+  overflow: auto;
+  padding: 8px;
+  border-radius: 18px;
+  border: 1px solid rgba(235, 98, 16, 0.32);
+  background: rgba(14, 14, 16, 0.98);
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.38);
+}
+
+.mention-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px;
+  border: 0;
+  border-radius: 14px;
+  background: transparent;
+  color: var(--text, #f5f5f5);
+  text-align: left;
+  cursor: pointer;
+}
+
+.mention-option:hover,
+.mention-option:focus-visible {
+  background: rgba(235, 98, 16, 0.14);
+  outline: none;
+}
+
+.mention-option strong,
+.mention-option small {
+  display: block;
+}
+
+.mention-option small,
+.mention-autocomplete-empty {
+  color: var(--muted, #a7adbd);
+}
+
+.mention-avatar {
+  width: 34px;
+  height: 34px;
+  flex: 0 0 34px;
+  display: inline-grid;
+  place-items: center;
+  border-radius: 999px;
+  background: rgba(235, 98, 16, 0.20);
+  color: var(--accent, #eb6210);
+  font-weight: 900;
+}
+
+.mention-autocomplete-empty {
+  padding: 10px 12px;
+}
+
