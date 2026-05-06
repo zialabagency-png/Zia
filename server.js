@@ -250,6 +250,7 @@ function normalizeTask(task) {
       id: item.id || generateId('cm'),
       authorId: item.authorId || '',
       text: String(item.text || '').trim(),
+      mentionIds: uniqStrings(item.mentionIds),
       createdAt: item.createdAt || now
     })).filter((item) => item.text),
     createdById: task.createdById || '',
@@ -400,6 +401,32 @@ function mapWorkStatus(value) {
     desconectado: 'offline'
   };
   return ['available', 'focus', 'meeting', 'break', 'offline'].includes(normalized) ? normalized : (alias[normalized] || 'available');
+}
+
+
+function isAdminUser(user = {}) {
+  return user?.role === 'Admin';
+}
+
+function taskHasUser(task = {}, userId = '') {
+  if (!userId) return false;
+  if (task.createdById === userId) return true;
+  if (getTaskAssigneeIds(task).includes(userId)) return true;
+  return normalizeArray(task.subtasks).some((subtask) => subtask.assigneeId === userId);
+}
+
+function userCanAccessTask(user = {}, task = {}) {
+  return isAdminUser(user) || taskHasUser(task, user?.id);
+}
+
+function filterVisibleTasksForUser(tasks = [], user = {}) {
+  return isAdminUser(user) ? tasks : tasks.filter((task) => taskHasUser(task, user?.id));
+}
+
+function filterVisibleClientsForUser(clients = [], visibleTasks = [], user = {}) {
+  if (isAdminUser(user)) return clients;
+  const clientIds = new Set(visibleTasks.map((task) => task.clientId).filter(Boolean));
+  return clients.filter((client) => client.ownerId === user?.id || clientIds.has(client.id));
 }
 
 function workStatusText(value) {
@@ -590,17 +617,19 @@ function createFileAdapter() {
     async getBootstrap(currentUser) {
       const db = cleanup(readDb());
       writeDb(db);
-      const tasks = decorateTasks(db).sort((a, b) => {
+      const allTasks = decorateTasks(db).sort((a, b) => {
         const aIndex = STATUS_ORDER.indexOf(a.status);
         const bIndex = STATUS_ORDER.indexOf(b.status);
         if (aIndex !== bIndex) return (aIndex === -1 ? 99 : aIndex) - (bIndex === -1 ? 99 : bIndex);
         return new Date(b.updatedAt || 0) - new Date(a.updatedAt || 0);
       });
+      const tasks = filterVisibleTasksForUser(allTasks, currentUser);
+      const clients = filterVisibleClientsForUser(db.clients, tasks, currentUser);
       return {
         brand: db.brand,
         currentUser: sanitizeUser(currentUser),
         users: db.users.map(sanitizeUser),
-        clients: db.clients,
+        clients,
         tasks,
         emailLogs: currentUser.role === 'Admin' ? db.emailLogs.slice().sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).slice(0, 25) : [],
         workSessions: listVisibleWorkSessions(db, currentUser),
@@ -1223,12 +1252,15 @@ function createPostgresAdapter() {
           : 'SELECT * FROM activity_logs WHERE user_id = $1 ORDER BY created_at DESC LIMIT 40',
         currentUser.role === 'Admin' ? [] : [currentUser.id]
       );
+      const allTasks = await getTasksWithAttachments();
+      const tasks = filterVisibleTasksForUser(allTasks, currentUser);
+      const clients = filterVisibleClientsForUser(clientsRes.rows.map(mapClientRow), tasks, currentUser);
       return {
         brand: loadSeedData().brand,
         currentUser: sanitizeUser(currentUser),
         users: usersRes.rows.map(mapUserRow).map(sanitizeUser),
-        clients: clientsRes.rows.map(mapClientRow),
-        tasks: await getTasksWithAttachments(),
+        clients,
+        tasks,
         emailLogs: emailLogsRes.rows.map((row) => normalizeEmailLog({
           id: row.id,
           toEmail: row.to_email,
@@ -1562,26 +1594,36 @@ function createPostgresAdapter() {
 const adapter = process.env.DATABASE_URL ? createPostgresAdapter() : createFileAdapter();
 
 function createMailer() {
-  if (process.env.SMTP_HOST && process.env.SMTP_FROM) {
+  const smtpHost = String(process.env.SMTP_HOST || '').trim();
+  const smtpService = String(process.env.SMTP_SERVICE || '').trim();
+  const smtpUser = String(process.env.SMTP_USER || '').trim();
+  const smtpPass = String(process.env.SMTP_PASS || '').trim();
+  const smtpFrom = String(process.env.SMTP_FROM || '').trim() || (smtpUser ? `Zia WorkSpace <${smtpUser}>` : '');
+
+  if ((smtpHost || smtpService) && smtpFrom) {
+    const transportConfig = smtpService
+      ? { service: smtpService, auth: smtpUser ? { user: smtpUser, pass: smtpPass } : undefined }
+      : {
+          host: smtpHost,
+          port: Number(process.env.SMTP_PORT || 587),
+          secure: process.env.SMTP_SECURE === 'true',
+          auth: smtpUser ? { user: smtpUser, pass: smtpPass } : undefined,
+          connectionTimeout: Number(process.env.SMTP_CONNECTION_TIMEOUT_MS || 8000),
+          greetingTimeout: Number(process.env.SMTP_GREETING_TIMEOUT_MS || 8000),
+          socketTimeout: Number(process.env.SMTP_SOCKET_TIMEOUT_MS || 12000)
+        };
     return {
       mode: 'smtp',
-      transporter: nodemailer.createTransport({
-        host: process.env.SMTP_HOST,
-        port: Number(process.env.SMTP_PORT || 587),
-        secure: process.env.SMTP_SECURE === 'true',
-        auth: process.env.SMTP_USER ? { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS || '' } : undefined,
-        connectionTimeout: Number(process.env.SMTP_CONNECTION_TIMEOUT_MS || 8000),
-        greetingTimeout: Number(process.env.SMTP_GREETING_TIMEOUT_MS || 8000),
-        socketTimeout: Number(process.env.SMTP_SOCKET_TIMEOUT_MS || 12000)
-      })
+      from: smtpFrom,
+      transporter: nodemailer.createTransport(transportConfig)
     };
   }
   return {
     mode: 'log',
+    from: smtpFrom || 'Zia WorkSpace <no-reply@zialab.com>',
     transporter: nodemailer.createTransport({ jsonTransport: true })
   };
 }
-
 const mailer = createMailer();
 const fallbackLogMailer = nodemailer.createTransport({ jsonTransport: true });
 
@@ -1594,7 +1636,7 @@ async function sendMailWithTimeout(transporter, payload, timeoutMs = Number(proc
 
 async function sendTransactionalEmail({ to, subject, textBody, htmlBody, previewLink = '' }) {
   const payload = {
-    from: process.env.SMTP_FROM || 'Zia WorkSpace <no-reply@zialab.com>',
+    from: mailer.from || process.env.SMTP_FROM || 'Zia WorkSpace <no-reply@zialab.com>',
     to,
     subject,
     text: textBody,
@@ -1621,6 +1663,27 @@ async function sendTransactionalEmail({ to, subject, textBody, htmlBody, preview
     previewLink
   });
   return { mode: deliveryMode, log };
+}
+
+async function getMailDiagnostics() {
+  const config = {
+    mode: mailer.mode,
+    hasSmtpHost: Boolean(process.env.SMTP_HOST),
+    hasSmtpService: Boolean(process.env.SMTP_SERVICE),
+    hasSmtpUser: Boolean(process.env.SMTP_USER),
+    hasSmtpPass: Boolean(process.env.SMTP_PASS),
+    from: mailer.from || '',
+    appBaseUrl: APP_BASE_URL
+  };
+  if (mailer.mode !== 'smtp') {
+    return { ok: false, config, message: 'El correo está en modo registro porque faltan SMTP_HOST/SMTP_SERVICE o un remitente SMTP_FROM/SMTP_USER.' };
+  }
+  try {
+    await mailer.transporter.verify();
+    return { ok: true, config, message: 'SMTP verificado correctamente.' };
+  } catch (error) {
+    return { ok: false, config, message: error.message };
+  }
 }
 
 async function createActionLink(user, type) {
@@ -1756,6 +1819,44 @@ Fecha límite: ${task.dueDate || 'Sin fecha'}
 Abre tu panel aquí: ${link}`;
   const htmlBody = `<p>Hola <strong>${user.name || 'equipo'}</strong>,</p><p>Se te asignó una tarea en <strong>Zia WorkSpace</strong>.</p><ul><li><strong>Tarea:</strong> ${task.title}</li><li><strong>Cliente:</strong> ${clientName}</li><li><strong>Estado:</strong> ${statusText(task.status)}</li><li><strong>Fecha límite:</strong> ${task.dueDate || 'Sin fecha'}</li></ul><p><a href="${link}">Abrir Zia WorkSpace</a></p>`;
   return { subject, textBody, htmlBody, previewLink: link };
+}
+
+function buildTaskMentionEmail(user, task, comment, author, clientName) {
+  const link = buildWorkspaceLink();
+  const subject = `Te etiquetaron en: ${task.title}`;
+  const textBody = `Hola ${user.name || 'equipo'},
+
+${author?.name || 'Un compañero'} te etiquetó en una tarea de Zia WorkSpace.
+
+Tarea: ${task.title}
+Cliente: ${clientName}
+Comentario: ${comment.text}
+
+Abre tu panel aquí: ${link}`;
+  const htmlBody = `<p>Hola <strong>${user.name || 'equipo'}</strong>,</p><p><strong>${author?.name || 'Un compañero'}</strong> te etiquetó en una tarea de <strong>Zia WorkSpace</strong>.</p><ul><li><strong>Tarea:</strong> ${task.title}</li><li><strong>Cliente:</strong> ${clientName}</li><li><strong>Comentario:</strong> ${comment.text}</li></ul><p><a href="${link}">Abrir Zia WorkSpace</a></p>`;
+  return { subject, textBody, htmlBody, previewLink: link };
+}
+
+async function maybeSendTaskMentionEmails(task, previousTask = null, actingUser = null) {
+  const settings = await adapter.getNotificationSettings();
+  if (!settings.enabled) return null;
+  const previousCommentIds = new Set(normalizeArray(previousTask?.comments).map((comment) => comment.id));
+  const newComments = normalizeArray(task.comments).filter((comment) => !previousCommentIds.has(comment.id) && normalizeArray(comment.mentionIds).length);
+  if (!newComments.length) return null;
+  const bootstrapUser = await adapter.listUsers().then((users) => users.find((item) => item.role === 'Admin') || users[0] || { role: 'Admin' });
+  const bootstrap = await adapter.getBootstrap(bootstrapUser);
+  let sent = 0;
+  for (const comment of newComments) {
+    for (const userId of uniqStrings(comment.mentionIds)) {
+      if (userId === actingUser?.id) continue;
+      const user = await adapter.getUserById(userId);
+      if (!user || user.status !== 'active' || !user.email) continue;
+      const email = buildTaskMentionEmail(user, task, comment, actingUser, getClientName(bootstrap.clients, task.clientId));
+      await sendTransactionalEmail({ to: user.email, ...email });
+      sent += 1;
+    }
+  }
+  return { ok: true, sent };
 }
 
 function buildTaskReminderEmail(user, task, clientName, kind, meta = {}) {
@@ -2261,12 +2362,17 @@ app.post('/api/tasks', requireAuth, requireAdmin, async (req, res, next) => {
 app.patch('/api/tasks/:id', requireAuth, async (req, res, next) => {
   try {
     const previousTask = await adapter.getBootstrap(req.currentUser).then((data) => data.tasks.find((item) => item.id === req.params.id) || null);
-    const task = await adapter.saveTask({ ...req.body, id: req.params.id, updatedAt: nowIso() });
+    if (!previousTask || !userCanAccessTask(req.currentUser, previousTask)) {
+      res.status(404).json({ error: 'Tarea no encontrada o sin permiso.' });
+      return;
+    }
+    const task = await adapter.saveTask({ ...req.body, id: req.params.id, createdById: previousTask.createdById || req.currentUser.id, updatedAt: nowIso() });
     if (!task) {
       res.status(404).json({ error: 'Tarea no encontrada.' });
       return;
     }
     await maybeSendTaskAssignmentEmail(task, previousTask);
+    await maybeSendTaskMentionEmails(task, previousTask, req.currentUser);
     if (typeof adapter.createActivityLog === 'function') await adapter.createActivityLog({ userId: req.currentUser.id, kind: 'task_update', label: `Actualizó la tarea "${task.title}".`, entityType: 'task', entityId: task.id, meta: { status: task.status } });
     res.json(task);
   } catch (error) {
@@ -2274,7 +2380,7 @@ app.patch('/api/tasks/:id', requireAuth, async (req, res, next) => {
   }
 });
 
-app.delete('/api/tasks/:id', requireAuth, async (req, res, next) => {
+app.delete('/api/tasks/:id', requireAuth, requireAdmin, async (req, res, next) => {
   try {
     const previousTask = await adapter.getBootstrap(req.currentUser).then((data) => data.tasks.find((item) => item.id === req.params.id) || null);
     const result = await adapter.deleteTask(req.params.id);
@@ -2297,7 +2403,7 @@ app.post('/api/tasks/:id/attachments', requireAuth, upload.single('file'), async
     }
     const tasks = await adapter.getBootstrap(req.currentUser).then((data) => data.tasks);
     const task = tasks.find((item) => item.id === req.params.id);
-    if (!task) {
+    if (!task || !userCanAccessTask(req.currentUser, task)) {
       fs.unlinkSync(req.file.path);
       res.status(404).json({ error: 'Tarea no encontrada.' });
       return;
@@ -2317,6 +2423,11 @@ app.get('/api/attachments/:id/download', requireAuth, async (req, res, next) => 
       res.status(404).json({ error: 'Adjunto no encontrado.' });
       return;
     }
+    const task = await adapter.getBootstrap(req.currentUser).then((data) => data.tasks.find((item) => item.id === attachment.taskId) || null);
+    if (!task || !userCanAccessTask(req.currentUser, task)) {
+      res.status(404).json({ error: 'Adjunto no encontrado.' });
+      return;
+    }
     const filePath = path.join(UPLOADS_DIR, attachment.storedName);
     if (!fs.existsSync(filePath)) {
       res.status(404).json({ error: 'El archivo no existe en disco.' });
@@ -2330,6 +2441,16 @@ app.get('/api/attachments/:id/download', requireAuth, async (req, res, next) => 
 
 app.delete('/api/attachments/:id', requireAuth, async (req, res, next) => {
   try {
+    const attachment = await adapter.getAttachment(req.params.id);
+    if (!attachment) {
+      res.status(404).json({ error: 'Adjunto no encontrado.' });
+      return;
+    }
+    const task = await adapter.getBootstrap(req.currentUser).then((data) => data.tasks.find((item) => item.id === attachment.taskId) || null);
+    if (!task || !userCanAccessTask(req.currentUser, task)) {
+      res.status(404).json({ error: 'Adjunto no encontrado.' });
+      return;
+    }
     const result = await adapter.deleteAttachment(req.params.id);
     if (!result.ok) {
       res.status(404).json({ error: 'Adjunto no encontrado.' });
@@ -2530,6 +2651,15 @@ app.delete('/api/admin/users/:id', requireAuth, requireAdmin, async (req, res, n
       });
     }
     res.json({ ok: true, user: result.user || null });
+  } catch (error) {
+    next(error);
+  }
+});
+
+
+app.get('/api/admin/mail-diagnostics', requireAuth, requireAdmin, async (_req, res, next) => {
+  try {
+    res.json(await getMailDiagnostics());
   } catch (error) {
     next(error);
   }
