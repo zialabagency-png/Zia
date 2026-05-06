@@ -2527,7 +2527,7 @@ function bindStaticEvents() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: document.getElementById('forgotEmail').value.trim() })
       });
-      showToast('Solicitud procesada', result.message || 'Revisa tu correo para continuar.', result.deliveryMode === 'smtp_error' ? 'error' : 'default');
+      showToast('Solicitud procesada', result.message || 'Revisa tu correo para continuar.');
     } catch (error) {
       showToast('Error', error.message, 'error');
     } finally {
