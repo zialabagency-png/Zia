@@ -104,17 +104,30 @@ const els = {
 };
 
 async function api(path, options = {}) {
-  const response = await fetch(path, {
-    credentials: 'same-origin',
-    ...options
-  });
-  const contentType = response.headers.get('content-type') || '';
-  const data = contentType.includes('application/json') ? await response.json() : await response.text();
-  if (!response.ok) {
-    const message = typeof data === 'string' ? data : data.error || data.detail || 'Error inesperado';
-    throw new Error(message);
+  const controller = new AbortController();
+  const timeoutMs = Number(options.timeoutMs || 30000);
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(path, {
+      credentials: 'same-origin',
+      ...options,
+      signal: options.signal || controller.signal
+    });
+    const contentType = response.headers.get('content-type') || '';
+    const data = contentType.includes('application/json') ? await response.json() : await response.text();
+    if (!response.ok) {
+      const message = typeof data === 'string' ? data : data.error || data.detail || 'Error inesperado';
+      throw new Error(message);
+    }
+    return data;
+  } catch (error) {
+    if (error?.name === 'AbortError') {
+      throw new Error('La solicitud tardó demasiado. Revisa tu conexión e inténtalo otra vez.');
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeout);
   }
-  return data;
 }
 
 function escapeHtml(value) {
@@ -135,6 +148,37 @@ function showToast(title, message, type = 'default') {
   }
   els.toastContainer.appendChild(toast);
   setTimeout(() => toast.remove(), 4200);
+}
+
+function setFormBusy(form, isBusy, buttonText = '') {
+  if (!form) return;
+  form.dataset.busy = isBusy ? 'true' : 'false';
+  const submitButton = form.querySelector('[type="submit"]');
+  const controls = form.querySelectorAll('button, input, select, textarea');
+  controls.forEach((control) => {
+    if (control.type === 'hidden') return;
+    if (isBusy) {
+      control.dataset.prevDisabled = control.disabled ? 'true' : 'false';
+      if (control === submitButton && control.tagName === 'BUTTON') {
+        control.dataset.prevText = control.textContent;
+      }
+      control.disabled = true;
+      if (buttonText && control === submitButton && control.tagName === 'BUTTON') {
+        control.textContent = buttonText;
+      }
+    } else {
+      control.disabled = control.dataset.prevDisabled === 'true';
+      if (control === submitButton && control.tagName === 'BUTTON' && control.dataset.prevText) {
+        control.textContent = control.dataset.prevText;
+      }
+      delete control.dataset.prevDisabled;
+      delete control.dataset.prevText;
+    }
+  });
+}
+
+function isFormBusy(form) {
+  return form?.dataset.busy === 'true';
 }
 
 function isoDate(date) {
@@ -2040,10 +2084,13 @@ async function saveTaskFromForm() {
 
   if (taskId) {
     state.tasks = state.tasks.map((task) => task.id === savedTask.id ? savedTask : task);
-  } else {
+  } else if (!savedTask.deduped) {
     state.tasks.unshift(savedTask);
   }
-  showToast('Tarea guardada', 'La tarea fue actualizada correctamente.');
+  if (!savedTask.deduped) {
+    showToast('Tarea guardada', taskId ? 'La tarea fue actualizada correctamente.' : 'La tarea fue creada correctamente.');
+  }
+  return savedTask;
 }
 
 async function saveClientFromForm() {
@@ -2449,6 +2496,8 @@ function bindStaticEvents() {
 
   els.loginView.addEventListener('submit', async (event) => {
     event.preventDefault();
+    if (isFormBusy(els.loginView)) return;
+    setFormBusy(els.loginView, true, 'Entrando...');
     try {
       const result = await api('/api/auth/login', {
         method: 'POST',
@@ -2463,23 +2512,26 @@ function bindStaticEvents() {
       openApp();
     } catch (error) {
       showToast('Acceso fallido', error.message, 'error');
+    } finally {
+      setFormBusy(els.loginView, false);
     }
   });
 
   els.forgotView.addEventListener('submit', async (event) => {
     event.preventDefault();
+    if (isFormBusy(els.forgotView)) return;
+    setFormBusy(els.forgotView, true, 'Enviando...');
     try {
       const result = await api('/api/auth/forgot-password', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: document.getElementById('forgotEmail').value.trim() })
       });
-      showToast('Solicitud procesada', result.previewLink || result.message);
-      if (result.previewLink) {
-        window.open(result.previewLink, '_self');
-      }
+      showToast('Solicitud procesada', result.message || 'Revisa tu correo para continuar.', result.deliveryMode === 'smtp_error' ? 'error' : 'default');
     } catch (error) {
       showToast('Error', error.message, 'error');
+    } finally {
+      setFormBusy(els.forgotView, false);
     }
   });
 
@@ -2575,18 +2627,27 @@ function bindStaticEvents() {
 
   els.taskForm.addEventListener('submit', async (event) => {
     event.preventDefault();
+    if (isFormBusy(els.taskForm)) return;
+    setFormBusy(els.taskForm, true, 'Guardando...');
     try {
-      await saveTaskFromForm();
+      const result = await saveTaskFromForm();
       closeTaskModal();
       render();
       bindDynamicActions();
+      if (result?.deduped) {
+        showToast('Tarea existente', 'Ya existía una tarea igual creada hace unos segundos. Evitamos duplicarla.');
+      }
     } catch (error) {
       showToast('Error', error.message, 'error');
+    } finally {
+      setFormBusy(els.taskForm, false);
     }
   });
 
   els.clientForm.addEventListener('submit', async (event) => {
     event.preventDefault();
+    if (isFormBusy(els.clientForm)) return;
+    setFormBusy(els.clientForm, true, 'Guardando...');
     try {
       await saveClientFromForm();
       closeClientModal();
@@ -2594,17 +2655,23 @@ function bindStaticEvents() {
       bindDynamicActions();
     } catch (error) {
       showToast('Error', error.message, 'error');
+    } finally {
+      setFormBusy(els.clientForm, false);
     }
   });
 
   els.userForm.addEventListener('submit', async (event) => {
     event.preventDefault();
+    if (isFormBusy(els.userForm)) return;
+    setFormBusy(els.userForm, true, 'Guardando...');
     try {
       await saveUserFromForm();
       closeUserModal();
       await refreshBootstrap();
     } catch (error) {
       showToast('Error', error.message, 'error');
+    } finally {
+      setFormBusy(els.userForm, false);
     }
   });
 
