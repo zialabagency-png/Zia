@@ -2497,7 +2497,8 @@ function bindDynamicActions() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ to: state.currentUser?.email || '' })
         });
-        showToast('Correo de prueba procesado', result.mode === 'smtp' ? 'SMTP respondió correctamente.' : 'Se generó en modo registro. Revisa configuración SMTP.');
+        const realModes = ['smtp', 'resend', 'brevo', 'sendgrid', 'mailersend', 'postmark'];
+        showToast('Correo de prueba procesado', realModes.includes(result.mode) ? `Enviado por ${result.mode.toUpperCase()}.` : 'Se generó en modo registro. Activa Resend, Brevo o SendGrid si SMTP sigue bloqueado en Render.');
         await refreshBootstrap();
       } catch (error) {
         showToast('Error', error.message, 'error');
