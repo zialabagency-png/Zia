@@ -274,6 +274,47 @@ function getTaskResourceLinks(task) {
   return Array.isArray(task?.resourceLinks) ? task.resourceLinks : [];
 }
 
+function getTaskComments(task) {
+  return Array.isArray(task?.comments) ? task.comments : [];
+}
+
+function getLastTaskComment(task) {
+  const comments = getTaskComments(task).slice().sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+  return comments[0] || null;
+}
+
+function renderMentionCheckboxes(selectedIds = []) {
+  const selected = uniqueIds(selectedIds);
+  return state.users
+    .filter((user) => user.id !== state.currentUser?.id && user.status !== 'disabled')
+    .map((user) => `<label class="mention-check-item"><input type="checkbox" value="${user.id}" ${selected.includes(user.id) ? 'checked' : ''} /><span>@${escapeHtml(user.name)}</span><small>${escapeHtml(user.role)}</small></label>`)
+    .join('') || '<div class="empty-state compact-empty">No hay compañeros disponibles para etiquetar.</div>';
+}
+
+function getSelectedMentionIds() {
+  return [...document.querySelectorAll('#taskMentionBox input[type="checkbox"]:checked')].map((input) => input.value);
+}
+
+function renderTaskComments(task) {
+  const container = document.getElementById('taskExistingComments');
+  if (!container) return;
+  const comments = getTaskComments(task).slice().sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+  if (!comments.length) {
+    container.innerHTML = '<div class="empty-state compact-empty">Aún no hay comentarios internos.</div>';
+    return;
+  }
+  container.innerHTML = comments.map((comment) => `
+    <article class="task-comment-item">
+      <div class="task-comment-head">
+        <strong>${escapeHtml(getUserName(comment.authorId))}</strong>
+        <span class="small-text">${escapeHtml(formatDateTime(comment.createdAt))}</span>
+      </div>
+      <p>${escapeHtml(comment.text)}</p>
+      ${Array.isArray(comment.mentionIds) && comment.mentionIds.length ? `<div class="tags-row">${comment.mentionIds.map((id) => `<span class="badge mention-badge">@${escapeHtml(getUserName(id))}</span>`).join('')}</div>` : ''}
+    </article>
+  `).join('');
+}
+
 function parseResourceLinks(text, existingLinks = []) {
   const existingByUrl = new Map((Array.isArray(existingLinks) ? existingLinks : []).map((item) => [String(item.url || '').trim(), item]));
   return String(text || '')
@@ -838,6 +879,8 @@ function getFilteredTasks() {
       task.description,
       getClientName(task.clientId),
       getTaskAssigneeNames(task),
+      getTaskComments(task).map((comment) => comment.text).join(' '),
+      getTaskResourceLinks(task).map((link) => `${link.label || ''} ${link.url || ''}`).join(' '),
       ...(task.labels || []),
       ...getTaskSubtasks(task).flatMap((subtask) => [subtask.title, subtask.deliverable, getUserName(subtask.assigneeId)])
     ].join(' ').toLowerCase();
@@ -1078,6 +1121,8 @@ function renderTaskCard(task) {
   const checklistSummary = getChecklistSummary(task);
   const subtaskSummary = getSubtaskSummary(task);
   const resourceLinks = getTaskResourceLinks(task);
+  const lastComment = getLastTaskComment(task);
+  const commentCount = getTaskComments(task).length;
   return `
     <article class="task-card ${statusClass(task.status)}" draggable="true" data-task-id="${task.id}">
       <div class="task-card-header">
@@ -1103,10 +1148,12 @@ function renderTaskCard(task) {
         ${checklistSummary.total ? `<span class="task-chip">Checklist ${checklistSummary.completed}/${checklistSummary.total}</span>` : ''}
         ${subtaskSummary.total ? `<span class="task-chip">Subtareas ${subtaskSummary.completed}/${subtaskSummary.total}</span>` : ''}
         ${resourceLinks.length ? `<span class="task-chip">Enlaces ${resourceLinks.length}</span>` : ''}
+        ${commentCount ? `<span class="task-chip">Comentarios ${commentCount}</span>` : ''}
       </div>
       ${renderChecklistPreview(task, { maxItems: 4 })}
       ${renderSubtaskPreview(task)}
       ${resourceLinks.length ? `<div class="task-link-list">${resourceLinks.slice(0, 2).map((link) => `<a class="task-resource-link" href="${escapeHtml(link.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(link.label || link.provider || 'Abrir enlace')}</a>`).join('')}${resourceLinks.length > 2 ? `<span class="small-text">+${resourceLinks.length - 2} enlaces</span>` : ''}</div>` : ''}
+      ${lastComment ? `<div class="task-last-comment"><strong>${escapeHtml(getUserName(lastComment.authorId))}:</strong> ${escapeHtml(lastComment.text)}</div>` : ''}
       ${(task.labels || []).length ? `<div class="tags-row">${task.labels.map((label) => `<span class="badge">#${escapeHtml(label)}</span>`).join('')}</div>` : ''}
       <div class="task-card-footer">
         <label class="inline-status-wrap">
@@ -1965,7 +2012,9 @@ function openTaskModal(taskId = '', preset = {}) {
   }
   document.getElementById('taskChecklist').value = (task?.checklist || []).map((item) => item.text).join('\n');
   document.getElementById('taskComment').value = '';
+  document.getElementById('taskMentionBox').innerHTML = renderMentionCheckboxes();
   document.getElementById('taskLinks').value = getTaskResourceLinks(task).map((item) => item.url).join('\n');
+  renderTaskComments(task || null);
   renderTaskSubtasksEditor(task || null);
   renderTaskResourceLinks(task);
   els.taskModalBackdrop.classList.remove('hidden');
@@ -2066,7 +2115,7 @@ async function saveTaskFromForm() {
       ...(() => {
         const commentText = document.getElementById('taskComment').value.trim();
         if (!commentText) return [];
-        return [{ text: commentText, authorId: state.currentUser.id, createdAt: new Date().toISOString() }];
+        return [{ text: commentText, authorId: state.currentUser.id, mentionIds: getSelectedMentionIds(), createdAt: new Date().toISOString() }];
       })()
     ],
     createdAt: original?.createdAt,
@@ -2574,6 +2623,16 @@ function bindStaticEvents() {
   document.getElementById('addSubtaskButton').addEventListener('click', () => addSubtaskRow());
   document.getElementById('taskLinks').addEventListener('input', (event) => {
     renderTaskResourceLinks({ resourceLinks: parseResourceLinks(event.target.value) });
+  });
+
+  document.querySelectorAll('[data-link-template]').forEach((button) => {
+    button.addEventListener('click', () => {
+      const field = document.getElementById('taskLinks');
+      const current = field.value.trim();
+      field.value = `${current}${current ? '\n' : ''}${button.dataset.linkTemplate}`;
+      field.focus();
+      renderTaskResourceLinks({ resourceLinks: parseResourceLinks(field.value) });
+    });
   });
   els.newClientButton.addEventListener('click', () => openClientModal());
   els.newUserButton.addEventListener('click', () => openUserModal());
