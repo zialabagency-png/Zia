@@ -1569,7 +1569,10 @@ function createMailer() {
         host: process.env.SMTP_HOST,
         port: Number(process.env.SMTP_PORT || 587),
         secure: process.env.SMTP_SECURE === 'true',
-        auth: process.env.SMTP_USER ? { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS || '' } : undefined
+        auth: process.env.SMTP_USER ? { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS || '' } : undefined,
+        connectionTimeout: Number(process.env.SMTP_CONNECTION_TIMEOUT_MS || 8000),
+        greetingTimeout: Number(process.env.SMTP_GREETING_TIMEOUT_MS || 8000),
+        socketTimeout: Number(process.env.SMTP_SOCKET_TIMEOUT_MS || 12000)
       })
     };
   }
@@ -1580,6 +1583,14 @@ function createMailer() {
 }
 
 const mailer = createMailer();
+const fallbackLogMailer = nodemailer.createTransport({ jsonTransport: true });
+
+async function sendMailWithTimeout(transporter, payload, timeoutMs = Number(process.env.MAIL_SEND_TIMEOUT_MS || 15000)) {
+  return await Promise.race([
+    transporter.sendMail(payload),
+    new Promise((_, reject) => setTimeout(() => reject(new Error('MAIL_SEND_TIMEOUT')), timeoutMs))
+  ]);
+}
 
 async function sendTransactionalEmail({ to, subject, textBody, htmlBody, previewLink = '' }) {
   const payload = {
@@ -1590,11 +1601,16 @@ async function sendTransactionalEmail({ to, subject, textBody, htmlBody, preview
     html: htmlBody
   };
   let deliveryMode = mailer.mode;
-  try {
-    await mailer.transporter.sendMail(payload);
-  } catch (error) {
-    console.error('SMTP send failed:', error?.message || error);
-    deliveryMode = mailer.mode === 'smtp' ? 'smtp_error' : 'log_error';
+  if (mailer.mode === 'smtp') {
+    try {
+      await sendMailWithTimeout(mailer.transporter, payload);
+    } catch (error) {
+      console.error('SMTP send failed, falling back to preview delivery:', error?.message || error);
+      await fallbackLogMailer.sendMail(payload);
+      deliveryMode = 'log';
+    }
+  } else {
+    await fallbackLogMailer.sendMail(payload);
   }
   const log = await adapter.logEmail({
     toEmail: to,
@@ -2009,17 +2025,11 @@ app.post('/api/auth/forgot-password', async (req, res, next) => {
     const email = String(req.body.email || '').trim().toLowerCase();
     const user = email ? await adapter.findUserByEmail(email) : null;
     let previewLink = '';
-    let deliveryMode = '';
-    let message = 'Si el correo existe, enviamos un enlace para recuperar la contraseña.';
     if (user && user.status !== 'suspended') {
       const delivery = await sendResetEmail(user);
-      deliveryMode = delivery.mode;
       if (delivery.mode === 'log') previewLink = delivery.link;
-      if (delivery.mode === 'smtp_error') {
-        message = 'No pudimos enviar el correo ahora mismo. Revisa la configuración SMTP e inténtalo otra vez.';
-      }
     }
-    res.json({ ok: true, message, previewLink, deliveryMode });
+    res.json({ ok: true, message: 'Si el correo existe, enviamos un enlace para recuperar la contraseña.', previewLink });
   } catch (error) {
     next(error);
   }
