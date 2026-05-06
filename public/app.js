@@ -37,7 +37,7 @@ const state = {
     weekendDigest: true
   },
   tab: 'dashboard',
-  taskView: 'board',
+  taskView: 'table',
   filters: {
     search: '',
     clientId: 'all',
@@ -1092,13 +1092,18 @@ function renderDashboard() {
 }
 
 function renderTasks() {
-  els.workspace.innerHTML = state.taskView === 'board' ? renderTaskBoardHtml(getFilteredTasks()) : renderTaskTableHtml(getFilteredTasks());
+  const filteredTasks = getFilteredTasks();
+  els.workspace.innerHTML = state.taskView === 'board' ? renderTaskBoardHtml(filteredTasks) : renderTaskTableHtml(filteredTasks);
+  if (els.taskViewToggle) {
+    [...els.taskViewToggle.querySelectorAll('[data-view]')].forEach((item) => item.classList.toggle('active', item.dataset.view === state.taskView));
+  }
   bindBoardInteractions();
 }
 
 function renderTaskBoardHtml(tasks) {
   return `
-    <section class="panel">
+    <section class="panel board-panel">
+      <div class="board-scroll-hint small-text">Desliza para ver las etapas. La vista principal recomendada es Tabla.</div>
       <div class="board-grid six-columns">
         ${STATUS_CONFIG.map((status) => {
           const columnTasks = tasks.filter((task) => task.status === status.key);
@@ -1200,8 +1205,15 @@ function renderTaskTableHtml(tasks) {
                   <strong>${escapeHtml(task.title)}</strong>
                   <div class="table-subtext">${escapeHtml(task.type)} · ${escapeHtml(task.channel)} · ${escapeHtml(task.priority)}</div>
                 </div>
-                ${checklistSummary.total ? `<div class="task-table-check-meta">Checklist ${checklistSummary.completed}/${checklistSummary.total}</div>` : ''}
-                ${renderChecklistPreview(task, { maxItems: 2, compact: true })}
+                ${checklistSummary.total ? `
+                  <div class="task-table-check-row">
+                    <div class="task-table-check-meta">Checklist ${checklistSummary.completed}/${checklistSummary.total}</div>
+                    <button class="text-button mini-button" type="button" data-expand-checklist="${task.id}" aria-expanded="false">Ver checklist</button>
+                  </div>
+                  <div class="table-checklist-preview" data-checklist-panel="${task.id}">
+                    ${renderChecklistPreview(task, { maxItems: 999, compact: true })}
+                  </div>
+                ` : ''}
               </td>
               <td data-label="Cliente">${escapeHtml(getClientName(task.clientId))}</td>
               <td data-label="Responsables">${escapeHtml(getTaskAssigneeNames(task))}</td>
@@ -1622,6 +1634,7 @@ function renderAdmin() {
           <div class="table-actions settings-actions-row">
             <button class="primary-button" type="submit">Guardar ajustes</button>
             <button class="secondary-button" id="runRemindersButton" type="button">Ejecutar recordatorios ahora</button>
+            <button class="secondary-button" id="sendMailTestButton" type="button">Probar correo</button>
           </div>
           <p class="small-text">Usa SMTP para invitaciones, recuperación y recordatorios automáticos. Si SMTP no está configurado, Zia WorkSpace seguirá registrando el envío en el log interno.</p>
         </form>
@@ -2287,6 +2300,18 @@ function bindDynamicActions() {
       }
     });
   });
+  document.querySelectorAll('[data-expand-checklist]').forEach((button) => {
+    button.addEventListener('click', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      const panel = document.querySelector(`[data-checklist-panel="${button.dataset.expandChecklist}"]`);
+      if (!panel) return;
+      const isOpen = panel.classList.toggle('is-open');
+      button.setAttribute('aria-expanded', String(isOpen));
+      button.textContent = isOpen ? 'Ocultar checklist' : 'Ver checklist';
+    });
+  });
+
   document.querySelectorAll('[data-task-status-select]').forEach((select) => {
     select.addEventListener('change', async () => {
       const task = state.tasks.find((item) => item.id === select.dataset.taskStatusSelect);
@@ -2456,6 +2481,23 @@ function bindDynamicActions() {
       try {
         const result = await api('/api/admin/reminders/run', { method: 'POST' });
         showToast('Recordatorios ejecutados', `Enviados: ${result.sent || 0} · Saltados: ${result.skipped || 0}`);
+        await refreshBootstrap();
+      } catch (error) {
+        showToast('Error', error.message, 'error');
+      }
+    });
+  }
+
+  const sendMailTestButton = document.getElementById('sendMailTestButton');
+  if (sendMailTestButton) {
+    sendMailTestButton.addEventListener('click', async () => {
+      try {
+        const result = await api('/api/admin/mail-test', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ to: state.currentUser?.email || '' })
+        });
+        showToast('Correo de prueba procesado', result.mode === 'smtp' ? 'SMTP respondió correctamente.' : 'Se generó en modo registro. Revisa configuración SMTP.');
         await refreshBootstrap();
       } catch (error) {
         showToast('Error', error.message, 'error');

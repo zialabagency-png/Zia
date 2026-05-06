@@ -3449,3 +3449,121 @@ body.drawer-open {
     justify-content: flex-start;
   }
 }
+
+/* Zia WorkSpace refinement: tabla principal, kanban fluido y checklist expandible */
+.board-panel {
+  overflow: hidden;
+}
+
+.board-scroll-hint {
+  margin-bottom: 12px;
+}
+
+.board-grid.six-columns {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(320px, 360px);
+  grid-template-columns: none;
+  gap: 16px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 2px 4px 14px;
+  scroll-snap-type: x proximity;
+}
+
+.board-column {
+  min-width: 0;
+  max-height: calc(100vh - 290px);
+  overflow-y: auto;
+  scroll-snap-align: start;
+}
+
+.task-card {
+  min-width: 0;
+  overflow: hidden;
+}
+
+.task-card-header,
+.task-meta-top,
+.task-card-footer {
+  min-width: 0;
+}
+
+.task-card-header > div,
+.task-table-title-wrap {
+  min-width: 0;
+}
+
+.task-title,
+.task-table-title-wrap strong,
+.table-subtext,
+.task-description,
+.task-last-comment,
+.resource-url {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.task-card-actions,
+.table-actions {
+  gap: 8px;
+}
+
+.enhanced-table-wrap {
+  overflow-x: auto;
+}
+
+.enhanced-table-wrap .data-table {
+  min-width: 1080px;
+}
+
+.task-table-check-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+}
+
+.mini-button {
+  padding: 7px 10px;
+  font-size: 0.82rem;
+  line-height: 1;
+}
+
+.table-checklist-preview {
+  display: none;
+  margin-top: 10px;
+  max-width: 520px;
+}
+
+.table-checklist-preview.is-open {
+  display: block;
+}
+
+.table-checklist-preview .checklist-preview {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.018);
+}
+
+@media (max-width: 900px) {
+  .board-grid.six-columns {
+    grid-auto-columns: minmax(82vw, 1fr);
+  }
+
+  .board-column {
+    max-height: unset;
+  }
+
+  .enhanced-table-wrap {
+    overflow: visible;
+  }
+
+  .enhanced-table-wrap .data-table {
+    min-width: 0;
+  }
+}
