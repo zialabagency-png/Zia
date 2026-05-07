@@ -7,6 +7,8 @@ const STATUS_CONFIG = [
   { key: 'scheduled', label: 'Programado' }
 ];
 
+const COMPLETED_TASK_STATUS_KEYS = ['review', 'sent', 'approved', 'scheduled'];
+
 const WORK_STATUS_CONFIG = [
   { key: 'available', label: 'Disponible' },
   { key: 'focus', label: 'En foco' },
@@ -43,7 +45,7 @@ const state = {
     clientId: 'all',
     assigneeId: 'all',
     priority: 'all',
-    timing: 'all',
+    timing: 'open',
     dateSort: 'asc'
   },
   calendarCursor: startOfMonth(new Date()),
@@ -54,7 +56,11 @@ const state = {
   tokenMode: '',
   tokenValue: '',
   liveWorkSessionIds: {},
-  selectedCalendarDate: ''
+  selectedCalendarDate: '',
+  adminActivityUserFilter: 'all',
+  adminActivityKindFilter: 'all',
+  adminActivityDateFilter: 'all',
+  adminActivitySearch: ''
 };
 
 const els = {
@@ -473,7 +479,7 @@ function getTaskSubtasks(task) {
 }
 
 function isTaskCompleted(task) {
-  return task?.status === 'scheduled';
+  return COMPLETED_TASK_STATUS_KEYS.includes(task?.status);
 }
 
 function getTaskDueReference(task) {
@@ -632,9 +638,102 @@ function getUserActivityLogs(userId, limit = 8) {
   return (state.activityLogs || []).filter((item) => item.userId === userId).slice(0, limit);
 }
 
+
+function dateKeyFromValue(value) {
+  if (!value) return '';
+  try {
+    return zonedTodayKey(new Date(value));
+  } catch (_error) {
+    return '';
+  }
+}
+
+function activityMatchesDateFilter(dateValue, filterValue) {
+  if (!filterValue || filterValue === 'all') return true;
+  const key = dateKeyFromValue(dateValue);
+  if (!key) return false;
+  const today = todayKey();
+  if (filterValue === 'today') return key === today;
+  const limit = filterValue === 'week' ? addDaysToKey(today, -7) : addDaysToKey(today, -31);
+  return key >= limit && key <= today;
+}
+
+function getFilteredAdminActivityLogs() {
+  const userFilter = state.adminActivityUserFilter || 'all';
+  const kindFilter = state.adminActivityKindFilter || 'all';
+  const dateFilter = state.adminActivityDateFilter || 'all';
+  const query = String(state.adminActivitySearch || '').trim().toLowerCase();
+  return (state.activityLogs || [])
+    .filter((item) => userFilter === 'all' || item.userId === userFilter)
+    .filter((item) => kindFilter === 'all' || item.kind === kindFilter)
+    .filter((item) => activityMatchesDateFilter(item.createdAt, dateFilter))
+    .filter((item) => {
+      if (!query) return true;
+      return [item.label, item.kind, item.entityType, getUserName(item.userId)]
+        .some((value) => String(value || '').toLowerCase().includes(query));
+    })
+    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+}
+
+function getFilteredAdminWorkSessions() {
+  const userFilter = state.adminActivityUserFilter || 'all';
+  const dateFilter = state.adminActivityDateFilter || 'all';
+  const query = String(state.adminActivitySearch || '').trim().toLowerCase();
+  return (state.workSessions || [])
+    .filter((session) => userFilter === 'all' || session.userId === userFilter)
+    .filter((session) => activityMatchesDateFilter(session.checkOutAt || session.checkInAt || session.updatedAt || session.createdAt, dateFilter))
+    .filter((session) => {
+      if (!query) return true;
+      return [getUserName(session.userId), session.focusPlan, session.blockers, session.endSummary, session.status, session.dateKey]
+        .some((value) => String(value || '').toLowerCase().includes(query));
+    })
+    .sort((a, b) => new Date(b.checkOutAt || b.checkInAt || b.updatedAt || b.createdAt || 0) - new Date(a.checkOutAt || a.checkInAt || a.updatedAt || a.createdAt || 0));
+}
+
+function renderAdminActivityFilters() {
+  const userOptions = ['<option value="all">Todos los usuarios</option>', ...state.users.map((user) => `<option value="${escapeHtml(user.id)}" ${state.adminActivityUserFilter === user.id ? 'selected' : ''}>${escapeHtml(user.name)}</option>`)].join('');
+  const logKinds = Array.from(new Set((state.activityLogs || []).map((item) => item.kind).filter(Boolean))).sort();
+  const kindOptions = ['<option value="all">Todos los eventos</option>', ...logKinds.map((kind) => `<option value="${escapeHtml(kind)}" ${state.adminActivityKindFilter === kind ? 'selected' : ''}>${escapeHtml(kind)}</option>`)].join('');
+  return `
+    <div class="admin-activity-toolbar">
+      <label class="field compact"><span>Usuario</span><select id="adminActivityUserFilter">${userOptions}</select></label>
+      <label class="field compact"><span>Evento</span><select id="adminActivityKindFilter">${kindOptions}</select></label>
+      <label class="field compact"><span>Periodo</span><select id="adminActivityDateFilter">
+        <option value="all" ${state.adminActivityDateFilter === 'all' ? 'selected' : ''}>Todo el historial</option>
+        <option value="today" ${state.adminActivityDateFilter === 'today' ? 'selected' : ''}>Hoy</option>
+        <option value="week" ${state.adminActivityDateFilter === 'week' ? 'selected' : ''}>Últimos 7 días</option>
+        <option value="month" ${state.adminActivityDateFilter === 'month' ? 'selected' : ''}>Últimos 31 días</option>
+      </select></label>
+      <label class="field compact admin-activity-search"><span>Buscar</span><input id="adminActivitySearch" type="search" value="${escapeHtml(state.adminActivitySearch || '')}" placeholder="Buscar salida, tarea, bloqueo..." /></label>
+    </div>
+  `;
+}
+
+function renderAdminWorkSessionCard(session) {
+  return `
+    <article class="admin-session-card ${workStatusClass(session.status)}">
+      <div class="activity-top">
+        <strong>${escapeHtml(getUserName(session.userId))}</strong>
+        <span class="small-text">${escapeHtml(formatDate(session.dateKey))}</span>
+      </div>
+      <div class="admin-session-grid">
+        <div><span class="small-text">Entrada</span><strong>${escapeHtml(formatDateTime(session.checkInAt))}</strong></div>
+        <div><span class="small-text">Salida</span><strong>${escapeHtml(formatDateTime(session.checkOutAt))}</strong></div>
+        <div><span class="small-text">Horas</span><strong>${escapeHtml(formatMinutes(getSessionWorkedMinutes(session)))}</strong></div>
+        <div><span class="small-text">Estado</span><strong>${escapeHtml(workStatusLabel(session.status))}</strong></div>
+      </div>
+      <div class="admin-session-answers">
+        <div><span class="small-text">Plan del día</span><p>${escapeHtml(session.focusPlan || 'Sin respuesta registrada.')}</p></div>
+        <div><span class="small-text">Bloqueos o necesidades</span><p>${escapeHtml(session.blockers || 'Sin respuesta registrada.')}</p></div>
+        <div><span class="small-text">Resumen de cierre</span><p>${escapeHtml(session.endSummary || 'Sin respuesta registrada.')}</p></div>
+      </div>
+    </article>
+  `;
+}
+
 function getUserRemoteMetrics(userId) {
   const openTasks = state.tasks.filter((task) => taskMatchesAssignee(task, userId) && !isTaskCompleted(task));
-  const overdue = openTasks.filter((task) => task.dueDate && task.dueDate < todayKey());
+  const overdue = openTasks.filter(isTaskOverdue);
   const openSubtasks = state.tasks.flatMap((task) => getTaskSubtasks(task).filter((subtask) => subtask.assigneeId === userId && subtask.status !== 'scheduled'));
   const completedSubtasks = state.tasks.flatMap((task) => getTaskSubtasks(task).filter((subtask) => subtask.assigneeId === userId && subtask.status === 'scheduled'));
   return {
@@ -722,8 +821,8 @@ function buildMonthlyReport(monthDate) {
       const daysWithEntry = sessions.filter((session) => session.checkInAt).length;
       const tasks = getMonthTasks(monthDate, user.id);
       const subtasks = getMonthSubtasks(monthDate, user.id);
-      const completedTasks = tasks.filter((task) => task.status === 'scheduled').length;
-      const overdueTasks = tasks.filter((task) => task.dueDate && task.dueDate < todayKey() && task.status !== 'scheduled').length;
+      const completedTasks = tasks.filter(isTaskCompleted).length;
+      const overdueTasks = tasks.filter(isTaskOverdue).length;
       const completedSubtasks = subtasks.filter((subtask) => subtask.status === 'scheduled').length;
       const openSubtasks = subtasks.filter((subtask) => subtask.status !== 'scheduled').length;
       const avgDailyMinutes = daysWithEntry ? Math.round(totalMinutes / daysWithEntry) : 0;
@@ -1742,7 +1841,8 @@ function renderAdmin() {
   const teamCheckedIn = state.users.filter((user) => getTodaySession(user.id)?.checkInAt).length;
   const teamCheckedOut = state.users.filter((user) => getTodaySession(user.id)?.checkOutAt).length;
   const totalOverdue = state.users.reduce((acc, user) => acc + getUserRemoteMetrics(user.id).overdueTasks, 0);
-  const recentActivity = (state.activityLogs || []).slice(0, 20);
+  const filteredActivityLogs = getFilteredAdminActivityLogs();
+  const filteredWorkSessions = getFilteredAdminWorkSessions();
   const activeUsers = state.users.filter((user) => user.status === 'active').length;
   const invitedUsers = state.users.filter((user) => user.status === 'invited').length;
   const adminCount = state.users.filter((user) => user.role === 'Admin').length;
@@ -1882,24 +1982,47 @@ function renderAdmin() {
           <p class="small-text">Usa SMTP para invitaciones, recuperación y recordatorios automáticos. Si SMTP no está configurado, Zia WorkSpace seguirá registrando el envío en el log interno.</p>
         </form>
       </section>
-      <section class="panel admin-activity-panel">
+      <section class="panel admin-activity-panel full-span">
         <div class="panel-header admin-section-header">
           <div>
             <p class="eyebrow">Actividad</p>
             <h3 class="panel-title">Bitácora del equipo</h3>
+            <p class="small-text">Filtra por usuario, periodo o evento para revisar entradas, salidas, respuestas de cierre y cambios del equipo.</p>
+          </div>
+          <div class="admin-summary-pills">
+            <span class="badge">${filteredWorkSessions.length} jornadas</span>
+            <span class="badge">${filteredActivityLogs.length} eventos</span>
           </div>
         </div>
-        <div class="activity-feed admin-activity-feed">
-          ${recentActivity.length ? recentActivity.map((item) => `
-            <article class="activity-item admin-activity-item">
-              <div class="activity-top">
-                <strong>${escapeHtml(getUserName(item.userId))}</strong>
-                <span class="small-text">${escapeHtml(formatDateTime(item.createdAt))}</span>
-              </div>
-              <p>${escapeHtml(item.label)}</p>
-              <div class="small-text">${escapeHtml(item.kind)}${item.entityType ? ` · ${escapeHtml(item.entityType)}` : ''}</div>
-            </article>
-          `).join('') : `<div class="empty-state">Todavía no hay actividad registrada.</div>`}
+        ${renderAdminActivityFilters()}
+        <div class="admin-activity-pro-grid">
+          <div class="admin-activity-column">
+            <div class="activity-column-heading">
+              <h4 class="panel-title no-margin">Jornadas y respuestas</h4>
+              <span class="small-text">Entrada, salida y preguntas obligatorias.</span>
+            </div>
+            <div class="activity-feed admin-session-feed">
+              ${filteredWorkSessions.length ? filteredWorkSessions.slice(0, 120).map(renderAdminWorkSessionCard).join('') : `<div class="empty-state">No hay jornadas con esos filtros.</div>`}
+            </div>
+          </div>
+          <div class="admin-activity-column">
+            <div class="activity-column-heading">
+              <h4 class="panel-title no-margin">Eventos del sistema</h4>
+              <span class="small-text">Creación, edición, login, invitaciones y cambios.</span>
+            </div>
+            <div class="activity-feed admin-activity-feed">
+              ${filteredActivityLogs.length ? filteredActivityLogs.slice(0, 160).map((item) => `
+                <article class="activity-item admin-activity-item">
+                  <div class="activity-top">
+                    <strong>${escapeHtml(getUserName(item.userId))}</strong>
+                    <span class="small-text">${escapeHtml(formatDateTime(item.createdAt))}</span>
+                  </div>
+                  <p>${escapeHtml(item.label)}</p>
+                  <div class="small-text">${escapeHtml(item.kind)}${item.entityType ? ` · ${escapeHtml(item.entityType)}` : ''}</div>
+                </article>
+              `).join('') : `<div class="empty-state">No hay eventos con esos filtros.</div>`}
+            </div>
+          </div>
         </div>
       </section>
       <section class="panel admin-email-panel">
@@ -2630,6 +2753,43 @@ function bindDynamicActions() {
       }
     });
   });
+  const adminActivityUserFilter = document.getElementById('adminActivityUserFilter');
+  if (adminActivityUserFilter) {
+    adminActivityUserFilter.addEventListener('change', (event) => {
+      state.adminActivityUserFilter = event.target.value;
+      render();
+      bindDynamicActions();
+    });
+  }
+  const adminActivityKindFilter = document.getElementById('adminActivityKindFilter');
+  if (adminActivityKindFilter) {
+    adminActivityKindFilter.addEventListener('change', (event) => {
+      state.adminActivityKindFilter = event.target.value;
+      render();
+      bindDynamicActions();
+    });
+  }
+  const adminActivityDateFilter = document.getElementById('adminActivityDateFilter');
+  if (adminActivityDateFilter) {
+    adminActivityDateFilter.addEventListener('change', (event) => {
+      state.adminActivityDateFilter = event.target.value;
+      render();
+      bindDynamicActions();
+    });
+  }
+  const adminActivitySearch = document.getElementById('adminActivitySearch');
+  if (adminActivitySearch) {
+    adminActivitySearch.addEventListener('input', (event) => {
+      state.adminActivitySearch = event.target.value;
+      render();
+      bindDynamicActions();
+      const restored = document.getElementById('adminActivitySearch');
+      restored?.focus();
+      const length = restored?.value?.length || 0;
+      restored?.setSelectionRange?.(length, length);
+    });
+  }
+
   document.querySelectorAll('[data-delete-user]').forEach((button) => {
     button.addEventListener('click', async () => {
       const user = state.users.find((item) => item.id === button.dataset.deleteUser);

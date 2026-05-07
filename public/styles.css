@@ -3873,3 +3873,94 @@ body.drawer-open {
     min-width: 720px;
   }
 }
+
+/* Admin activity pro timeline */
+.admin-activity-toolbar {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(160px, 1fr));
+  gap: 14px;
+  margin: 18px 0 20px;
+}
+.admin-activity-search { min-width: 220px; }
+.admin-activity-pro-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, .85fr);
+  gap: 18px;
+  align-items: start;
+}
+.admin-activity-column {
+  border: 1px solid var(--border);
+  border-radius: 24px;
+  padding: 16px;
+  background: rgba(255,255,255,0.018);
+  min-width: 0;
+}
+.activity-column-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+.admin-session-feed,
+.admin-activity-feed {
+  max-height: 680px;
+  overflow: auto;
+  padding-right: 6px;
+}
+.admin-session-card {
+  border: 1px solid var(--border);
+  border-radius: 22px;
+  padding: 16px;
+  background: rgba(0,0,0,.25);
+  margin-bottom: 12px;
+}
+.admin-session-card.available { border-color: rgba(64, 214, 126, .22); }
+.admin-session-card.focus { border-color: rgba(108, 154, 255, .24); }
+.admin-session-card.meeting { border-color: rgba(186, 137, 255, .24); }
+.admin-session-card.break { border-color: rgba(255, 204, 102, .24); }
+.admin-session-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin: 14px 0;
+}
+.admin-session-grid > div,
+.admin-session-answers > div {
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 10px 12px;
+  background: rgba(255,255,255,.02);
+}
+.admin-session-grid strong {
+  display: block;
+  margin-top: 4px;
+  font-size: .95rem;
+}
+.admin-session-answers {
+  display: grid;
+  gap: 10px;
+}
+.admin-session-answers p {
+  margin: 6px 0 0;
+  color: var(--text);
+  white-space: pre-wrap;
+  line-height: 1.45;
+}
+.timing-completed .timing-badge,
+.timing-badge.timing-completed {
+  border-color: rgba(64, 214, 126, .35);
+  color: #d7ffe5;
+  background: rgba(64, 214, 126, .12);
+}
+@media (max-width: 1100px) {
+  .admin-activity-toolbar,
+  .admin-activity-pro-grid,
+  .admin-session-grid {
+    grid-template-columns: 1fr;
+  }
+  .admin-session-feed,
+  .admin-activity-feed {
+    max-height: none;
+  }
+}
