@@ -874,7 +874,7 @@ function createFileAdapter() {
       const db = cleanup(readDb());
       const log = normalizeActivityLog(payload);
       db.activityLogs.unshift(log);
-      db.activityLogs = db.activityLogs.slice(0, 500);
+      db.activityLogs = db.activityLogs.slice(0, 2000);
       writeDb(db);
       return log;
     },
@@ -1249,14 +1249,14 @@ function createPostgresAdapter() {
       ]);
       const workSessionsRes = await query(
         currentUser.role === 'Admin'
-          ? 'SELECT * FROM work_sessions ORDER BY updated_at DESC LIMIT 120'
-          : 'SELECT * FROM work_sessions WHERE user_id = $1 ORDER BY updated_at DESC LIMIT 30',
+          ? 'SELECT * FROM work_sessions ORDER BY updated_at DESC LIMIT 1000'
+          : 'SELECT * FROM work_sessions WHERE user_id = $1 ORDER BY updated_at DESC LIMIT 180',
         currentUser.role === 'Admin' ? [] : [currentUser.id]
       );
       const activityLogsRes = await query(
         currentUser.role === 'Admin'
-          ? 'SELECT * FROM activity_logs ORDER BY created_at DESC LIMIT 120'
-          : 'SELECT * FROM activity_logs WHERE user_id = $1 ORDER BY created_at DESC LIMIT 40',
+          ? 'SELECT * FROM activity_logs ORDER BY created_at DESC LIMIT 1000'
+          : 'SELECT * FROM activity_logs WHERE user_id = $1 ORDER BY created_at DESC LIMIT 180',
         currentUser.role === 'Admin' ? [] : [currentUser.id]
       );
       const allTasks = await getTasksWithAttachments();
