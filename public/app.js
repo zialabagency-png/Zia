@@ -1846,6 +1846,7 @@ function renderAdmin() {
   const activeUsers = state.users.filter((user) => user.status === 'active').length;
   const invitedUsers = state.users.filter((user) => user.status === 'invited').length;
   const adminCount = state.users.filter((user) => user.role === 'Admin').length;
+  const recentActivity = filteredActivityLogs.slice(0, 20);
 
   const teamCards = state.users.map((user) => {
     const metrics = getUserRemoteMetrics(user.id);
