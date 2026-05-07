@@ -3684,3 +3684,192 @@ body.drawer-open {
   padding: 10px 12px;
 }
 
+
+/* Zia WorkSpace: filtros, calendario por estado y rendimiento diario */
+.timing-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  width: max-content;
+  white-space: nowrap;
+}
+
+.timing-badge::before,
+.calendar-legend-item i {
+  content: '';
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  display: inline-block;
+  background: rgba(255,255,255,0.35);
+}
+
+.timing-overdue .timing-badge::before,
+.timing-badge.timing-overdue::before,
+.calendar-legend-item.timing-overdue i { background: #ef5b5b; }
+.timing-today .timing-badge::before,
+.timing-badge.timing-today::before,
+.calendar-legend-item.timing-today i { background: #ffc755; }
+.timing-week .timing-badge::before,
+.timing-badge.timing-week::before,
+.calendar-legend-item.timing-week i { background: #4f87ff; }
+.timing-completed .timing-badge::before,
+.timing-badge.timing-completed::before,
+.calendar-legend-item.timing-completed i { background: #46d698; }
+
+.timing-badge.timing-overdue { border-color: rgba(239,91,91,0.36); background: rgba(239,91,91,0.12); color: #ffd2d2; }
+.timing-badge.timing-today { border-color: rgba(255,199,85,0.34); background: rgba(255,199,85,0.12); color: #ffe4a8; }
+.timing-badge.timing-week { border-color: rgba(79,135,255,0.34); background: rgba(79,135,255,0.12); color: #cfe0ff; }
+.timing-badge.timing-completed { border-color: rgba(70,214,152,0.34); background: rgba(70,214,152,0.12); color: #c4ffe5; }
+
+.calendar-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 16px 0 12px;
+}
+
+.calendar-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--line);
+  background: rgba(255,255,255,0.025);
+  color: var(--muted);
+  border-radius: 999px;
+  padding: 8px 12px;
+  font-size: 0.86rem;
+}
+
+.calendar-day.has-overdue {
+  border-color: rgba(239,91,91,0.28);
+  background: linear-gradient(180deg, rgba(239,91,91,0.07), rgba(255,255,255,0.015));
+}
+
+.calendar-day.has-completed:not(.has-overdue) {
+  border-color: rgba(70,214,152,0.22);
+}
+
+.calendar-day-count {
+  min-width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255,255,255,0.06);
+  color: var(--text);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.calendar-day-count.is-empty {
+  opacity: 0;
+}
+
+.calendar-item {
+  display: grid;
+  gap: 3px;
+  cursor: pointer;
+}
+
+.calendar-item span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.calendar-item small {
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+
+.calendar-item.timing-overdue {
+  border-color: rgba(239,91,91,0.34);
+  background: rgba(239,91,91,0.13);
+  border-left-color: #ef5b5b !important;
+}
+
+.calendar-item.timing-today {
+  border-color: rgba(255,199,85,0.34);
+  background: rgba(255,199,85,0.12);
+  border-left-color: #ffc755 !important;
+}
+
+.calendar-item.timing-week {
+  border-color: rgba(79,135,255,0.34);
+  background: rgba(79,135,255,0.12);
+  border-left-color: #4f87ff !important;
+}
+
+.calendar-item.timing-completed {
+  border-color: rgba(70,214,152,0.34);
+  background: rgba(70,214,152,0.12);
+  border-left-color: #46d698 !important;
+}
+
+.data-table tr.timing-overdue td {
+  background: rgba(239,91,91,0.035);
+}
+
+.data-table tr.timing-completed td {
+  background: rgba(70,214,152,0.025);
+}
+
+.table-date-cell {
+  display: grid;
+  gap: 8px;
+  justify-items: start;
+}
+
+.report-daily-panel {
+  grid-column: 1 / -1;
+}
+
+.daily-hours-scroll {
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+
+.daily-hours-chart {
+  min-width: 860px;
+  height: 210px;
+  display: grid;
+  grid-template-columns: repeat(31, minmax(18px, 1fr));
+  align-items: end;
+  gap: 8px;
+  padding: 12px 4px 0;
+}
+
+.daily-hour-bar {
+  height: 180px;
+  display: grid;
+  grid-template-rows: 1fr auto;
+  gap: 8px;
+  align-items: end;
+  justify-items: center;
+}
+
+.daily-hour-bar span {
+  width: 100%;
+  min-height: 8px;
+  border-radius: 999px 999px 6px 6px;
+  background: linear-gradient(180deg, rgba(255,143,31,0.8), rgba(255,107,0,0.28));
+  border: 1px solid rgba(255,143,31,0.28);
+  box-shadow: 0 10px 24px rgba(255,107,0,0.08);
+}
+
+.daily-hour-bar small {
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+
+@media (max-width: 900px) {
+  .calendar-legend {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .daily-hours-chart {
+    min-width: 720px;
+  }
+}

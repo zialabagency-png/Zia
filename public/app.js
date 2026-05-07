@@ -42,7 +42,9 @@ const state = {
     search: '',
     clientId: 'all',
     assigneeId: 'all',
-    priority: 'all'
+    priority: 'all',
+    timing: 'all',
+    dateSort: 'asc'
   },
   calendarCursor: startOfMonth(new Date()),
   reportMonthCursor: startOfMonth(new Date()),
@@ -79,6 +81,8 @@ const els = {
   clientFilter: document.getElementById('clientFilter'),
   assigneeFilter: document.getElementById('assigneeFilter'),
   priorityFilter: document.getElementById('priorityFilter'),
+  timingFilter: document.getElementById('timingFilter'),
+  dateSortFilter: document.getElementById('dateSortFilter'),
   taskViewToggle: document.getElementById('taskViewToggle'),
   toastContainer: document.getElementById('toastContainer'),
   loginView: document.getElementById('loginView'),
@@ -477,6 +481,70 @@ function getTaskDueReference(task) {
   return dates[0] || '';
 }
 
+function addDaysToKey(dateKey, days) {
+  const date = new Date(`${dateKey}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return dateKey;
+  date.setDate(date.getDate() + days);
+  return isoDate(date);
+}
+
+function isTaskOverdue(task) {
+  const dueKey = getTaskDueReference(task) || task?.dueDate || '';
+  return Boolean(dueKey && dueKey < todayKey() && !isTaskCompleted(task));
+}
+
+function isTaskDueToday(task) {
+  const dueKey = getTaskDueReference(task) || task?.dueDate || '';
+  return Boolean(dueKey && dueKey === todayKey() && !isTaskCompleted(task));
+}
+
+function isTaskDueThisWeek(task) {
+  const dueKey = getTaskDueReference(task) || task?.dueDate || '';
+  if (!dueKey || isTaskCompleted(task)) return false;
+  const today = todayKey();
+  const weekLimit = addDaysToKey(today, 7);
+  return dueKey >= today && dueKey <= weekLimit;
+}
+
+function taskTimingClass(task) {
+  if (isTaskCompleted(task)) return 'timing-completed';
+  if (isTaskOverdue(task)) return 'timing-overdue';
+  if (isTaskDueToday(task)) return 'timing-today';
+  if (isTaskDueThisWeek(task)) return 'timing-week';
+  return 'timing-open';
+}
+
+function taskTimingLabel(task) {
+  if (isTaskCompleted(task)) return 'Completada';
+  if (isTaskOverdue(task)) return 'Vencida';
+  if (isTaskDueToday(task)) return 'Vence hoy';
+  if (isTaskDueThisWeek(task)) return 'Esta semana';
+  return 'Abierta';
+}
+
+function taskMatchesTimingFilter(task, filterValue) {
+  if (filterValue === 'overdue') return isTaskOverdue(task);
+  if (filterValue === 'today') return isTaskDueToday(task);
+  if (filterValue === 'week') return isTaskDueThisWeek(task);
+  if (filterValue === 'completed') return isTaskCompleted(task);
+  if (filterValue === 'open') return !isTaskCompleted(task);
+  return true;
+}
+
+function sortTasksForCurrentView(tasks) {
+  if (state.taskView !== 'table') return tasks;
+  const sorted = [...tasks];
+  const direction = state.filters.dateSort === 'desc' ? -1 : 1;
+  sorted.sort((a, b) => {
+    const aDate = getTaskDueReference(a) || a.dueDate || a.publishDate || '9999-12-31';
+    const bDate = getTaskDueReference(b) || b.dueDate || b.publishDate || '9999-12-31';
+    const dateCompare = aDate.localeCompare(bDate) * direction;
+    if (dateCompare) return dateCompare;
+    return String(a.title || '').localeCompare(String(b.title || ''), 'es');
+  });
+  return sorted;
+}
+
 function priorityClass(priority) {
   const lower = String(priority || '').toLowerCase();
   if (lower.startsWith('alta')) return 'high';
@@ -683,10 +751,15 @@ function buildMonthlyReport(monthDate) {
   const totalMinutes = employeeRows.reduce((sum, row) => sum + row.totalMinutes, 0);
   const totalDays = employeeRows.reduce((sum, row) => sum + row.daysWithEntry, 0);
   const hoursByWeek = [0, 0, 0, 0, 0, 0];
+  const daysInReportMonth = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0).getDate();
+  const hoursByDay = Array.from({ length: daysInReportMonth }, () => 0);
   monthSessions.forEach((session) => {
     const date = new Date(`${session.dateKey}T00:00:00`);
     const weekIndex = Math.min(5, Math.floor((date.getDate() - 1) / 7));
-    hoursByWeek[weekIndex] += getSessionWorkedMinutes(session);
+    const dayIndex = date.getDate() - 1;
+    const minutes = getSessionWorkedMinutes(session);
+    hoursByWeek[weekIndex] += minutes;
+    if (dayIndex >= 0 && dayIndex < hoursByDay.length) hoursByDay[dayIndex] += minutes;
   });
 
   return {
@@ -701,7 +774,8 @@ function buildMonthlyReport(monthDate) {
       overdueTasks: employeeRows.reduce((sum, row) => sum + row.overdueTasks, 0),
       compliance: monthTasks.length ? Math.round((employeeRows.reduce((sum, row) => sum + row.completedTasks, 0) / monthTasks.length) * 100) : 0
     },
-    hoursByWeek
+    hoursByWeek,
+    hoursByDay
   };
 }
 
@@ -995,6 +1069,7 @@ function getFilteredTasks() {
     if (state.filters.clientId !== 'all' && task.clientId !== state.filters.clientId) return false;
     if (state.filters.assigneeId !== 'all' && !taskMatchesAssignee(task, state.filters.assigneeId)) return false;
     if (state.filters.priority !== 'all' && task.priority !== state.filters.priority) return false;
+    if (!taskMatchesTimingFilter(task, state.filters.timing || 'all')) return false;
     const haystack = [
       task.title,
       task.description,
@@ -1018,6 +1093,9 @@ function seedSelectOptions() {
   const userOptions = [`<option value="all">Todos</option>`, ...state.users.map((user) => `<option value="${user.id}">${escapeHtml(user.name)}</option>`)].join('');
   els.assigneeFilter.innerHTML = userOptions;
   els.assigneeFilter.value = state.filters.assigneeId;
+  if (els.priorityFilter) els.priorityFilter.value = state.filters.priority || 'all';
+  if (els.timingFilter) els.timingFilter.value = state.filters.timing || 'all';
+  if (els.dateSortFilter) els.dateSortFilter.value = state.filters.dateSort || 'asc';
 
   document.getElementById('taskClient').innerHTML = state.clients.map((client) => `<option value="${client.id}">${escapeHtml(client.name)}</option>`).join('');
   document.getElementById('taskAssigneesBox').innerHTML = renderAssigneeCheckboxes([]);
@@ -1160,7 +1238,8 @@ function renderDashboard() {
                 </div>
                 <span class="badge ${priorityClass(task.priority)}">${escapeHtml(task.priority)}</span>
               </div>
-              <div class="small-text">Entrega ${escapeHtml(formatDate(getTaskDueReference(task)))} · Estado <span class="badge stage-badge ${statusClass(task.status)}">${escapeHtml(statusLabel(task.status))}</span></div>
+              <div class="small-text">Entrega ${escapeHtml(formatDate(getTaskDueReference(task)))} · Estado <span class="badge stage-badge ${statusClass(task.status)}">${escapeHtml(statusLabel(task.status))}</span>
+        <span class="badge timing-badge ${taskTimingClass(task)}">${escapeHtml(taskTimingLabel(task))}</span></div>
             </div>
           `).join('') : `<div class="empty-state">No hay entregas con esos filtros.</div>`}
         </div>
@@ -1213,7 +1292,7 @@ function renderDashboard() {
 }
 
 function renderTasks() {
-  const filteredTasks = getFilteredTasks();
+  const filteredTasks = sortTasksForCurrentView(getFilteredTasks());
   els.workspace.innerHTML = state.taskView === 'board' ? renderTaskBoardHtml(filteredTasks) : renderTaskTableHtml(filteredTasks);
   if (els.taskViewToggle) {
     [...els.taskViewToggle.querySelectorAll('[data-view]')].forEach((item) => item.classList.toggle('active', item.dataset.view === state.taskView));
@@ -1260,6 +1339,7 @@ function renderTaskCard(task) {
       </div>
       <div class="task-meta-top">
         <span class="badge stage-badge ${statusClass(task.status)}">${escapeHtml(statusLabel(task.status))}</span>
+        <span class="badge timing-badge ${taskTimingClass(task)}">${escapeHtml(taskTimingLabel(task))}</span>
         <div class="small-text">Responsables: ${escapeHtml(getTaskAssigneeNames(task))}</div>
       </div>
       <p class="task-description">${escapeHtml(task.description || 'Sin descripción')}</p>
@@ -1309,7 +1389,7 @@ function renderTaskTableHtml(tasks) {
             <th>Responsables</th>
             <th>Subtareas</th>
             <th>Estado</th>
-            <th>Entrega</th>
+            <th>Entrega <span class="small-text">${state.filters.dateSort === 'desc' ? '↓' : '↑'}</span></th>
             <th>Enlaces</th>
             <th>Acciones</th>
           </tr>
@@ -1320,7 +1400,7 @@ function renderTaskTableHtml(tasks) {
             const checklistSummary = getChecklistSummary(task);
             const resourceLinks = getTaskResourceLinks(task);
             return `
-            <tr>
+            <tr class="${taskTimingClass(task)}">
               <td data-label="Tarea">
                 <div class="task-table-title-wrap">
                   <strong>${escapeHtml(task.title)}</strong>
@@ -1340,7 +1420,12 @@ function renderTaskTableHtml(tasks) {
               <td data-label="Responsables">${escapeHtml(getTaskAssigneeNames(task))}</td>
               <td data-label="Subtareas">${subtaskSummary.total ? `${subtaskSummary.completed}/${subtaskSummary.total}` : '—'}</td>
               <td data-label="Estado"><select class="inline-status-select ${statusClass(task.status)}" data-task-status-select="${task.id}">${renderStatusOptions(task.status)}</select></td>
-              <td data-label="Entrega">${escapeHtml(formatDate(getTaskDueReference(task) || task.dueDate))}</td>
+              <td data-label="Entrega">
+                <div class="table-date-cell">
+                  <strong>${escapeHtml(formatDate(getTaskDueReference(task) || task.dueDate))}</strong>
+                  <span class="badge timing-badge ${taskTimingClass(task)}">${escapeHtml(taskTimingLabel(task))}</span>
+                </div>
+              </td>
               <td data-label="Enlaces">${resourceLinks.length}</td>
               <td data-label="Acciones">
                 <div class="table-actions">
@@ -1372,6 +1457,13 @@ function renderCalendar() {
     const items = getFilteredTasks().filter((task) => task.publishDate === key || task.dueDate === key);
     days.push({ date, key, items, isCurrentMonth: date.getMonth() === cursor.getMonth(), isSelected: selectedDate === key });
   }
+  const calendarTasks = getFilteredTasks().filter((task) => task.publishDate || task.dueDate || getTaskDueReference(task));
+  const calendarStats = {
+    completed: calendarTasks.filter(isTaskCompleted).length,
+    overdue: calendarTasks.filter(isTaskOverdue).length,
+    today: calendarTasks.filter(isTaskDueToday).length,
+    week: calendarTasks.filter(isTaskDueThisWeek).length
+  };
   const monthLabel = new Intl.DateTimeFormat('es-DO', { month: 'long', year: 'numeric' }).format(cursor);
 
   els.workspace.innerHTML = `
@@ -1388,17 +1480,24 @@ function renderCalendar() {
           <button class="ghost-button" id="nextMonthButton">Mes siguiente →</button>
         </div>
       </div>
+      <div class="calendar-legend">
+        <span class="calendar-legend-item timing-overdue"><i></i>Vencidas ${calendarStats.overdue}</span>
+        <span class="calendar-legend-item timing-today"><i></i>Vencen hoy ${calendarStats.today}</span>
+        <span class="calendar-legend-item timing-week"><i></i>Esta semana ${calendarStats.week}</span>
+        <span class="calendar-legend-item timing-completed"><i></i>Completadas ${calendarStats.completed}</span>
+      </div>
       <div class="calendar-scroll">
         <div class="calendar-grid">
           ${['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'].map((day) => `<div class="small-text calendar-weekday">${day}</div>`).join('')}
           ${days.map((day) => `
-            <div class="calendar-day ${day.isCurrentMonth ? '' : 'muted'} ${day.isSelected ? 'selected' : ''}" data-calendar-date="${day.key}">
+            <div class="calendar-day ${day.isCurrentMonth ? '' : 'muted'} ${day.isSelected ? 'selected' : ''} ${day.items.some(isTaskOverdue) ? 'has-overdue' : ''} ${day.items.some(isTaskCompleted) ? 'has-completed' : ''}" data-calendar-date="${day.key}">
               <div class="calendar-day-top">
                 <strong>${day.date.getDate()}</strong>
+                <span class="calendar-day-count ${day.items.length ? '' : 'is-empty'}">${day.items.length || ''}</span>
                 ${isAdmin() ? `<button type="button" class="calendar-add-button" data-create-task-date="${day.key}" aria-label="Crear tarea para ${day.key}">＋</button>` : ''}
               </div>
               <div class="calendar-day-items">
-                ${day.items.slice(0, 4).map((task) => `<div class="calendar-item ${statusClass(task.status)}" data-edit-task="${task.id}">${escapeHtml(task.title)}</div>`).join('')}
+                ${day.items.slice(0, 4).map((task) => `<div class="calendar-item ${statusClass(task.status)} ${taskTimingClass(task)}" data-edit-task="${task.id}"><span>${escapeHtml(task.title)}</span><small>${escapeHtml(taskTimingLabel(task))}</small></div>`).join('')}
                 ${day.items.length > 4 ? `<div class="small-text">+${day.items.length - 4} tareas</div>` : ''}
               </div>
             </div>
@@ -1494,6 +1593,29 @@ function renderReports() {
                 <strong>${formatMinutes(minutes)}</strong>
               </div>
             `).join('')}
+          </div>
+        </section>
+
+        <section class="panel inner-panel report-chart-panel report-daily-panel">
+          <div class="panel-header compact-head">
+            <div>
+              <h4 class="panel-title no-margin">Horas por día</h4>
+              <p class="small-text">Rendimiento diario acumulado del equipo en ${escapeHtml(monthLabel(state.reportMonthCursor))}.</p>
+            </div>
+          </div>
+          <div class="daily-hours-scroll">
+            <div class="daily-hours-chart" style="grid-template-columns: repeat(${report.hoursByDay.length}, minmax(18px, 1fr));">
+              ${report.hoursByDay.map((minutes, index) => {
+                const maxDayMinutes = Math.max(1, ...report.hoursByDay);
+                const height = Math.max(8, Math.round((minutes / maxDayMinutes) * 100));
+                return `
+                  <div class="daily-hour-bar" title="Día ${index + 1} · ${formatMinutes(minutes)}">
+                    <span style="height:${height}%"></span>
+                    <small>${index + 1}</small>
+                  </div>
+                `;
+              }).join('')}
+            </div>
           </div>
         </section>
 
@@ -2907,6 +3029,16 @@ function bindStaticEvents() {
   });
   els.priorityFilter.addEventListener('change', (event) => {
     state.filters.priority = event.target.value;
+    render();
+    bindDynamicActions();
+  });
+  els.timingFilter?.addEventListener('change', (event) => {
+    state.filters.timing = event.target.value;
+    render();
+    bindDynamicActions();
+  });
+  els.dateSortFilter?.addEventListener('change', (event) => {
+    state.filters.dateSort = event.target.value;
     render();
     bindDynamicActions();
   });
