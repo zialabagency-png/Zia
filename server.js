@@ -22,7 +22,7 @@ const DB_FILE = path.join(DATA_DIR, 'db.json');
 const UPLOADS_DIR = path.join(DATA_DIR, 'uploads');
 const SESSION_COOKIE = 'zia_session';
 const SESSION_DAYS = 30;
-const STATUS_ORDER = ['not_started', 'in_progress', 'review', 'sent', 'approved', 'scheduled'];
+const STATUS_ORDER = ['not_started', 'in_progress', 'review', 'sent', 'editing', 'approved', 'scheduled'];
 const TOKEN_TYPES = { INVITE: 'invite', RESET: 'reset' };
 const APP_BASE_URL = process.env.APP_BASE_URL || `http://localhost:${PORT}`;
 
@@ -161,6 +161,10 @@ function mapLegacyStatus(status) {
     revisión: 'review',
     revision: 'review',
     enviado: 'sent',
+    'en edición': 'editing',
+    'en edicion': 'editing',
+    editing: 'editing',
+    editando: 'editing',
     aprobado: 'approved',
     programado: 'scheduled'
   };
@@ -173,6 +177,7 @@ function statusText(value) {
     in_progress: 'En proceso',
     review: 'Revisión',
     sent: 'Enviado',
+    editing: 'En edición',
     approved: 'Aprobado',
     scheduled: 'Programado'
   }[mapLegacyStatus(value)] || 'Sin iniciar';
@@ -2092,7 +2097,7 @@ function daysBetweenDates(fromDateString, toDateString) {
 }
 
 function isTaskOpen(task) {
-  return Boolean(task) && task.status !== 'scheduled';
+  return Boolean(task) && !['review', 'sent', 'editing', 'approved', 'scheduled'].includes(task.status);
 }
 
 function buildWorkspaceLink() {
@@ -2251,7 +2256,7 @@ async function safeLogActivity(payload = {}) {
 async function maybeSendTaskAssignmentEmail(task, previousTask = null) {
   const settings = await adapter.getNotificationSettings();
   const currentIds = getTaskAssigneeIds(task);
-  if (!settings.enabled || !settings.assignmentEmails || !currentIds.length || task.status === 'scheduled') return null;
+  if (!settings.enabled || !settings.assignmentEmails || !currentIds.length || !isTaskOpen(task)) return null;
   const previousIds = previousTask ? getTaskAssigneeIds(previousTask) : [];
   const targetIds = previousTask ? currentIds.filter((id) => !previousIds.includes(id)) : currentIds;
   if (!targetIds.length) return null;
