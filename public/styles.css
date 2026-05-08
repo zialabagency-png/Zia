@@ -1277,6 +1277,12 @@ code {
   --stage-text: #e1ccff;
 }
 
+.status-editing {
+  --stage-bg: rgba(43, 196, 122, 0.14);
+  --stage-border: rgba(43, 196, 122, 0.32);
+  --stage-text: #bdf4d3;
+}
+
 .status-approved {
   --stage-bg: rgba(43, 196, 122, 0.14);
   --stage-border: rgba(43, 196, 122, 0.32);
@@ -1314,6 +1320,7 @@ code {
 .task-card.status-in_progress,
 .task-card.status-review,
 .task-card.status-sent,
+.task-card.status-editing,
 .task-card.status-approved,
 .task-card.status-scheduled {
   border-color: var(--stage-border, var(--line));
@@ -1323,6 +1330,7 @@ code {
 .board-column.status-in_progress,
 .board-column.status-review,
 .board-column.status-sent,
+.board-column.status-editing,
 .board-column.status-approved,
 .board-column.status-scheduled {
   box-shadow: inset 0 1px 0 var(--stage-border, transparent);
@@ -1332,6 +1340,7 @@ code {
 .dot.status-in_progress,
 .dot.status-review,
 .dot.status-sent,
+.dot.status-editing,
 .dot.status-approved,
 .dot.status-scheduled {
   background: var(--stage-text, var(--orange));
@@ -2958,6 +2967,7 @@ body.drawer-open {
 .calendar-item.status-in_progress,
 .calendar-item.status-review,
 .calendar-item.status-sent,
+.calendar-item.status-editing,
 .calendar-item.status-approved,
 .calendar-item.status-scheduled {
   border-left: 2px solid rgba(255,255,255,0.16);
@@ -2966,6 +2976,7 @@ body.drawer-open {
 .calendar-item.status-in_progress { border-left-color: rgba(79,135,255,0.82); }
 .calendar-item.status-review { border-left-color: rgba(255,199,85,0.88); }
 .calendar-item.status-sent { border-left-color: rgba(176,124,255,0.9); }
+.calendar-item.status-editing { border-left-color: rgba(70,214,152,0.92); }
 .calendar-item.status-approved { border-left-color: rgba(70,214,152,0.92); }
 .calendar-item.status-scheduled { border-left-color: rgba(255,143,31,0.9); }
 

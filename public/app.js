@@ -3,11 +3,12 @@ const STATUS_CONFIG = [
   { key: 'in_progress', label: 'En proceso' },
   { key: 'review', label: 'Revisión' },
   { key: 'sent', label: 'Enviado' },
+  { key: 'editing', label: 'En edición' },
   { key: 'approved', label: 'Aprobado' },
   { key: 'scheduled', label: 'Programado' }
 ];
 
-const COMPLETED_TASK_STATUS_KEYS = ['review', 'sent', 'approved', 'scheduled'];
+const COMPLETED_TASK_STATUS_KEYS = ['review', 'sent', 'editing', 'approved', 'scheduled'];
 
 const WORK_STATUS_CONFIG = [
   { key: 'available', label: 'Disponible' },
